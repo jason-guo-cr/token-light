@@ -1,6 +1,7 @@
 import unittest
+from unittest.mock import patch
 
-from token_light.serial_writer import encode_snapshot_line, write_snapshot
+from token_light.serial_writer import encode_snapshot_line, resolve_serial_port, write_snapshot
 
 
 class FakeSerial:
@@ -28,6 +29,15 @@ class SerialWriterTests(unittest.TestCase):
 
         self.assertEqual(fake.data, b'{"type":"snapshot"}\n')
         self.assertTrue(fake.flushed)
+
+    def test_resolve_auto_port_uses_detected_esp32_port(self):
+        with patch("token_light.serial_writer.detected_esp32_ports", return_value=["/dev/cu.usbmodem1234"]):
+            self.assertEqual(resolve_serial_port("auto"), "/dev/cu.usbmodem1234")
+
+    def test_resolve_auto_port_reports_missing_esp32(self):
+        with patch("token_light.serial_writer.detected_esp32_ports", return_value=[]):
+            with self.assertRaisesRegex(RuntimeError, "No Espressif"):
+                resolve_serial_port("auto")
 
 
 if __name__ == "__main__":

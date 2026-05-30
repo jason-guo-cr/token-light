@@ -9,7 +9,7 @@ from pathlib import Path
 
 from token_light.auth import DEFAULT_AUTH_FILE, AuthError, read_access_token
 from token_light.codex_usage import UsageFetchError, UsageParseError, fetch_usage, parse_usage
-from token_light.serial_writer import DEFAULT_PORT, detected_serial_ports, open_serial_port, write_snapshot
+from token_light.serial_writer import DEFAULT_PORT, detected_esp32_ports, detected_serial_ports, open_serial_port, write_snapshot
 from token_light.snapshot import build_error_snapshot, build_snapshot
 
 
@@ -38,6 +38,7 @@ def run(args: argparse.Namespace) -> int:
             serial_port = open_serial_port(args.port, settle_seconds=args.serial_settle)
         except Exception as exc:
             print(f"Serial port unavailable: {args.port}", file=sys.stderr)
+            print(f"Detected ESP32 ports: {', '.join(detected_esp32_ports()) or 'none'}", file=sys.stderr)
             print(f"Detected ports: {', '.join(detected_serial_ports()) or 'none'}", file=sys.stderr)
             print(str(exc), file=sys.stderr)
             return 2
