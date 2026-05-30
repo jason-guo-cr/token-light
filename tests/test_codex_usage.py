@@ -22,6 +22,7 @@ class CodexUsageTests(unittest.TestCase):
         self.assertEqual(usage.secondary.used_percent, 4)
         self.assertEqual(usage.secondary.remaining_percent, 96)
         self.assertEqual(usage.secondary.window_minutes, 10080)
+        self.assertEqual(usage.secondary.reset_at, 1780217709)
 
     def test_remaining_percent_is_clamped(self):
         payload = {
