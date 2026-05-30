@@ -35,22 +35,37 @@ def _build_snapshot(args: argparse.Namespace) -> dict:
 
 def run(args: argparse.Namespace) -> int:
     serial_port = None
-    if not args.stdout:
-        try:
-            serial_port = open_serial_port(args.port, settle_seconds=args.serial_settle)
-        except Exception as exc:
-            print(f"Serial port unavailable: {args.port}", file=sys.stderr)
-            print(f"Detected ESP32 ports: {', '.join(detected_esp32_ports()) or 'none'}", file=sys.stderr)
-            print(f"Detected ports: {', '.join(detected_serial_ports()) or 'none'}", file=sys.stderr)
-            print(str(exc), file=sys.stderr)
-            return 2
 
     while True:
         snapshot = _build_snapshot(args)
         if args.stdout:
             print(json.dumps(snapshot, separators=(",", ":"), ensure_ascii=True), flush=True)
         else:
-            write_snapshot(serial_port, snapshot)
+            if serial_port is None:
+                try:
+                    serial_port = open_serial_port(args.port, settle_seconds=args.serial_settle)
+                except Exception as exc:
+                    print(f"Serial port unavailable: {args.port}", file=sys.stderr, flush=True)
+                    print(f"Detected ESP32 ports: {', '.join(detected_esp32_ports()) or 'none'}", file=sys.stderr, flush=True)
+                    print(f"Detected ports: {', '.join(detected_serial_ports()) or 'none'}", file=sys.stderr, flush=True)
+                    print(str(exc), file=sys.stderr, flush=True)
+                    if args.once:
+                        return 2
+                    time.sleep(args.interval)
+                    continue
+            try:
+                write_snapshot(serial_port, snapshot)
+            except Exception as exc:
+                print(f"Serial write failed: {exc}", file=sys.stderr, flush=True)
+                try:
+                    serial_port.close()
+                except Exception:
+                    pass
+                serial_port = None
+                if args.once:
+                    return 2
+                time.sleep(args.interval)
+                continue
             print(
                 f"sent {snapshot.get('status', 'unknown')} snapshot at {snapshot.get('time', '--:--')}",
                 file=sys.stderr,
