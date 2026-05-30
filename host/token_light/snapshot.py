@@ -7,19 +7,26 @@ from token_light.codex_usage import UsageStatus, UsageWindow
 
 
 LOCAL_TZ = ZoneInfo("Asia/Shanghai")
+WEEKDAYS = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
 
 def _now() -> datetime:
     return datetime.now(tz=LOCAL_TZ)
 
 
+def _as_local(now: datetime) -> datetime:
+    if now.tzinfo is None:
+        return now.replace(tzinfo=LOCAL_TZ)
+    return now.astimezone(LOCAL_TZ)
+
+
 def _base_snapshot(now: datetime) -> dict:
-    local = now.astimezone(LOCAL_TZ)
+    local = _as_local(now)
     return {
         "type": "snapshot",
         "sent_at": local.isoformat(timespec="seconds"),
         "date": local.strftime("%m/%d"),
-        "weekday": local.strftime("%a").upper(),
+        "weekday": WEEKDAYS[local.weekday()],
         "time": local.strftime("%H:%M"),
     }
 
@@ -35,7 +42,7 @@ def _label_for_window(window_minutes: int) -> str:
 
 def _reset_label(reset_at: int, now: datetime) -> str:
     reset_dt = datetime.fromtimestamp(reset_at, tz=LOCAL_TZ)
-    local_now = now.astimezone(LOCAL_TZ)
+    local_now = _as_local(now)
     if reset_dt.date() == local_now.date():
         return reset_dt.strftime("%H:%M")
     return reset_dt.strftime("%m/%d")
