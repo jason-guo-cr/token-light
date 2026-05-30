@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 
@@ -17,10 +18,13 @@ def write_snapshot(port, snapshot: dict[str, Any]) -> None:
     port.flush()
 
 
-def open_serial_port(port_name: str = DEFAULT_PORT):
+def open_serial_port(port_name: str = DEFAULT_PORT, settle_seconds: float = 3.0):
     import serial
 
-    return serial.Serial(port_name, BAUD_RATE, timeout=1)
+    port = serial.Serial(port_name, BAUD_RATE, timeout=1)
+    if settle_seconds > 0:
+        time.sleep(settle_seconds)
+    return port
 
 
 def detected_serial_ports() -> list[str]:

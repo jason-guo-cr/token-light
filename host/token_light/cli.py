@@ -35,7 +35,7 @@ def run(args: argparse.Namespace) -> int:
     serial_port = None
     if not args.stdout:
         try:
-            serial_port = open_serial_port(args.port)
+            serial_port = open_serial_port(args.port, settle_seconds=args.serial_settle)
         except Exception as exc:
             print(f"Serial port unavailable: {args.port}", file=sys.stderr)
             print(f"Detected ports: {', '.join(detected_serial_ports()) or 'none'}", file=sys.stderr)
@@ -48,6 +48,11 @@ def run(args: argparse.Namespace) -> int:
             print(json.dumps(snapshot, separators=(",", ":"), ensure_ascii=True), flush=True)
         else:
             write_snapshot(serial_port, snapshot)
+            print(
+                f"sent {snapshot.get('status', 'unknown')} snapshot at {snapshot.get('time', '--:--')}",
+                file=sys.stderr,
+                flush=True,
+            )
         if args.once:
             return 0
         time.sleep(args.interval)
@@ -58,6 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--auth-file", type=Path, default=Path(os.environ.get("TOKEN_LIGHT_AUTH_FILE", DEFAULT_AUTH_FILE)))
     parser.add_argument("--port", default=os.environ.get("TOKEN_LIGHT_PORT", DEFAULT_PORT))
     parser.add_argument("--interval", type=int, default=60)
+    parser.add_argument("--serial-settle", type=float, default=3.0)
     parser.add_argument("--mock", type=Path)
     parser.add_argument("--stdout", action="store_true")
     parser.add_argument("--once", action="store_true")
