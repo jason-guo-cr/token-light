@@ -26,6 +26,7 @@ class CodexUsageTests(unittest.TestCase):
 
     def test_remaining_percent_is_clamped(self):
         payload = {
+            "plan_type": "prolite",
             "rate_limit": {
                 "primary_window": {
                     "used_percent": -5,
@@ -42,6 +43,7 @@ class CodexUsageTests(unittest.TestCase):
 
         usage = parse_usage(payload)
 
+        self.assertEqual(usage.plan_type, "prolite")
         self.assertEqual(usage.primary.remaining_percent, 100)
         self.assertEqual(usage.secondary.remaining_percent, 0)
 

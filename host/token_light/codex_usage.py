@@ -68,7 +68,7 @@ def parse_usage(payload: Any) -> UsageStatus:
     if not isinstance(rate_limit, dict):
         raise UsageParseError("rate_limit is missing or invalid")
 
-    plan_type = rate_limit.get("plan_type")
+    plan_type = rate_limit.get("plan_type", payload.get("plan_type"))
     if plan_type is not None and not isinstance(plan_type, str):
         plan_type = str(plan_type)
 
