@@ -42,7 +42,8 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
   u8g2.setFont(u8g2_font_9x18B_tf);
   String topLeft = snapshot.date + " " + snapshot.weekday;
   u8g2.drawStr(16, 28, topLeft.c_str());
-  u8g2.drawStr(310, 28, stale ? "STALE" : "LIVE");
+  const char *state = stale ? "STALE" : (snapshot.status == "live" ? "LIVE" : "WAIT");
+  u8g2.drawStr(310, 28, state);
 
   u8g2.drawFrame(14, 44, 372, 88);
   u8g2.drawFrame(26, 56, 348, 64);
