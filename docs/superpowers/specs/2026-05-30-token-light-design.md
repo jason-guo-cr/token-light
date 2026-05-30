@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a polished dashboard for the Waveshare ESP32-S3-RLCD-4.2 that shows current date/time, OpenAI usage/cost remaining against a configured monthly budget, and small status details in a black-and-white desk-display UI.
+Build a polished dashboard for the Waveshare ESP32-S3-RLCD-4.2 that shows current date/time, real OpenAI usage and cost data, and small status details in a black-and-white desk-display UI.
 
 ## Hardware
 
@@ -20,18 +20,10 @@ The Mac host will fetch real OpenAI organization usage and cost data. The ESP32 
 Required host configuration:
 
 - `OPENAI_ADMIN_KEY`: an OpenAI Admin API key with access to organization usage/cost endpoints.
-- `TOKEN_LIGHT_MONTHLY_BUDGET_USD`: the monthly budget cap used to compute remaining balance.
 - `TOKEN_LIGHT_PORT`: optional serial port override, defaulting to `/dev/cu.usbmodem3101`.
 - `TOKEN_LIGHT_ORG_ID`: optional organization id if the API call or account setup requires explicit organization selection.
 
-Balance formula:
-
-```text
-remaining_usd = TOKEN_LIGHT_MONTHLY_BUDGET_USD - current_month_cost_usd
-remaining_percent = clamp(remaining_usd / TOKEN_LIGHT_MONTHLY_BUDGET_USD, 0, 1)
-```
-
-The display labels this as budget remaining, not an official account balance, because OpenAI exposes usage/cost records via API while monthly budget limits are configured separately.
+The display does not invent a remaining-balance value. OpenAI exposes organization usage and cost records via API, so the first implementation displays current month cost, today cost, token totals, and API freshness. If OpenAI later exposes an official balance or credit-grant endpoint for the user's account type, the host agent can add it as another snapshot field.
 
 ## Architecture
 
@@ -40,7 +32,6 @@ The system has two parts:
 1. Mac sync agent
    - Reads configuration from environment variables or a local ignored `.env`.
    - Calls OpenAI organization usage/cost endpoints.
-   - Computes monthly budget remaining.
    - Sends compact JSON snapshots over USB serial once per minute and immediately at startup.
 
 2. ESP32 display firmware
@@ -62,10 +53,8 @@ The Mac sends newline-delimited JSON:
   "weekday": "SAT",
   "time": "15:50",
   "month_reset": "06/01 00:00",
-  "monthly_budget_usd": 100.0,
   "month_cost_usd": 12.34,
-  "remaining_usd": 87.66,
-  "remaining_percent": 0.8766,
+  "today_cost_usd": 1.23,
   "input_tokens": 1234567,
   "output_tokens": 234567,
   "total_tokens": 1469134,
@@ -106,8 +95,8 @@ Landscape layout:
   - Local time continues ticking between host sync messages.
 
 - Middle metric cards
-  - Left card: `MONTH LIMIT`, remaining percent, horizontal progress bar, reset time.
-  - Right card: `COST USED` or `TOKEN USED`, current month cost/token total, last update.
+  - Left card: `MONTH COST`, current month cost, today cost, reset time.
+  - Right card: `TOKEN USED`, current month token total, input/output split, last update.
 
 - Bottom status strip
   - Temperature and humidity if the onboard sensor is supported in the selected firmware stack.
@@ -117,7 +106,6 @@ Landscape layout:
 ## Error Handling
 
 - Missing OpenAI Admin key: Mac agent exits with a clear setup message and never sends fake live data.
-- Missing budget: Mac agent exits with a clear setup message.
 - OpenAI API failure: Mac agent sends an `api_error` snapshot with the current time.
 - Serial port unavailable: Mac agent lists detected `/dev/cu.*` candidates.
 - Stale data on device: firmware displays `STALE` when no snapshot arrives for more than 5 minutes.
@@ -127,9 +115,9 @@ Landscape layout:
 
 Host agent tests:
 
-- Budget math clamps remaining percent between 0 and 100%.
 - Month window uses local Asia/Shanghai dates unless configured otherwise.
 - OpenAI API response parsing handles empty buckets, multiple result rows, and missing optional token fields.
+- Cost parsing computes current month and current day totals from official cost buckets.
 - Serial message formatting produces one compact JSON object per line.
 
 Firmware tests/build checks:
@@ -142,12 +130,12 @@ Manual verification:
 
 - Flash firmware to the detected ESP32-S3 serial device.
 - Run host agent with mock data and confirm UI appears.
-- Run host agent with real OpenAI Admin key and budget.
+- Run host agent with a real OpenAI Admin key.
 - Confirm the device updates at startup and then once per minute.
 
 ## Non-Goals
 
 - Store OpenAI credentials on the ESP32.
 - Use Wi-Fi for the first version.
-- Implement an official OpenAI account-balance feature beyond API-exposed usage/cost data.
+- Invent an account-balance or remaining-quota number when no official source is available.
 - Build a full settings UI on the device.
