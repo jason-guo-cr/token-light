@@ -25,6 +25,14 @@ class AuthTests(unittest.TestCase):
             with self.assertRaisesRegex(AuthError, "access token"):
                 read_access_token(auth_path)
 
+    def test_non_object_json_root_raises_clear_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            auth_path = Path(tmp) / "auth.json"
+            auth_path.write_text(json.dumps([]), encoding="utf-8")
+
+            with self.assertRaisesRegex(AuthError, "valid JSON object"):
+                read_access_token(auth_path)
+
 
 if __name__ == "__main__":
     unittest.main()

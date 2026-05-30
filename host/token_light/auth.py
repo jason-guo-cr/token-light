@@ -20,6 +20,9 @@ def read_access_token(auth_file: Path | str = DEFAULT_AUTH_FILE) -> str:
     except json.JSONDecodeError as exc:
         raise AuthError(f"Codex auth file is not valid JSON: {path}") from exc
 
+    if not isinstance(payload, dict):
+        raise AuthError(f"Codex auth file is not a valid JSON object: {path}")
+
     token = payload.get("tokens", {}).get("access_token")
     if not isinstance(token, str) or not token:
         raise AuthError(f"Codex auth file does not contain an access token: {path}")
