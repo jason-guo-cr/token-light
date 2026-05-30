@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a polished dashboard for the Waveshare ESP32-S3-RLCD-4.2 that shows current date/time, real OpenAI usage and cost data, and small status details in a black-and-white desk-display UI.
+Build a polished dashboard for the Waveshare ESP32-S3-RLCD-4.2 that shows current date/time, Codex usage-limit remaining percentages, reset times, and small status details in a black-and-white desk-display UI.
 
 ## Hardware
 
@@ -15,23 +15,23 @@ Build a polished dashboard for the Waveshare ESP32-S3-RLCD-4.2 that shows curren
 
 ## Data Source
 
-The Mac host will fetch real OpenAI organization usage and cost data. The ESP32 firmware will not store OpenAI credentials or call OpenAI directly.
+The Mac host will fetch the same Codex usage-limit information shown in the Codex app usage menu. The ESP32 firmware will not store credentials or call ChatGPT/OpenAI endpoints directly.
 
 Required host configuration:
 
-- `OPENAI_ADMIN_KEY`: an OpenAI Admin API key with access to organization usage/cost endpoints.
 - `TOKEN_LIGHT_PORT`: optional serial port override, defaulting to `/dev/cu.usbmodem3101`.
-- `TOKEN_LIGHT_ORG_ID`: optional organization id if the API call or account setup requires explicit organization selection.
+- `TOKEN_LIGHT_AUTH_FILE`: optional Codex auth file override, defaulting to `~/.codex/auth.json`.
 
-The display does not invent a remaining-balance value. OpenAI exposes organization usage and cost records via API, so the first implementation displays current month cost, today cost, token totals, and API freshness. If OpenAI later exposes an official balance or credit-grant endpoint for the user's account type, the host agent can add it as another snapshot field.
+The host agent reads the existing Codex ChatGPT login token from the local Codex auth file and calls `https://chatgpt.com/backend-api/wham/usage`. The endpoint returns `rate_limit.primary_window` and `rate_limit.secondary_window`, including `used_percent`, `limit_window_seconds`, and `reset_at`. The display computes remaining percent as `100 - used_percent`.
 
 ## Architecture
 
 The system has two parts:
 
 1. Mac sync agent
-   - Reads configuration from environment variables or a local ignored `.env`.
-   - Calls OpenAI organization usage/cost endpoints.
+   - Reads the existing Codex ChatGPT login token from the local Codex auth file.
+   - Calls the Codex usage endpoint used by the desktop app.
+   - Extracts primary and secondary usage windows.
    - Sends compact JSON snapshots over USB serial once per minute and immediately at startup.
 
 2. ESP32 display firmware
@@ -52,17 +52,28 @@ The Mac sends newline-delimited JSON:
   "date": "05/30",
   "weekday": "SAT",
   "time": "15:50",
-  "month_reset": "06/01 00:00",
-  "month_cost_usd": 12.34,
-  "today_cost_usd": 1.23,
-  "input_tokens": 1234567,
-  "output_tokens": 234567,
-  "total_tokens": 1469134,
+  "plan_type": "prolite",
+  "primary": {
+    "label": "5H LIMIT",
+    "remaining_percent": 97,
+    "used_percent": 3,
+    "reset_label": "20:36",
+    "reset_at": 1780144603,
+    "window_minutes": 300
+  },
+  "secondary": {
+    "label": "WEEK LIMIT",
+    "remaining_percent": 96,
+    "used_percent": 4,
+    "reset_label": "05/31",
+    "reset_at": 1780217709,
+    "window_minutes": 10080
+  },
   "status": "live"
 }
 ```
 
-If the host cannot fetch OpenAI data, it sends:
+If the host cannot fetch Codex usage data, it sends:
 
 ```json
 {
@@ -72,7 +83,7 @@ If the host cannot fetch OpenAI data, it sends:
   "weekday": "SAT",
   "time": "15:50",
   "status": "api_error",
-  "message": "OpenAI request failed"
+  "message": "Codex usage request failed"
 }
 ```
 
@@ -95,8 +106,8 @@ Landscape layout:
   - Local time continues ticking between host sync messages.
 
 - Middle metric cards
-  - Left card: `MONTH COST`, current month cost, today cost, reset time.
-  - Right card: `TOKEN USED`, current month token total, input/output split, last update.
+  - Left card: `5H LIMIT`, remaining percent, horizontal progress bar, reset time.
+  - Right card: `WEEK LIMIT`, remaining percent, horizontal progress bar, reset date.
 
 - Bottom status strip
   - Temperature and humidity if the onboard sensor is supported in the selected firmware stack.
@@ -105,8 +116,8 @@ Landscape layout:
 
 ## Error Handling
 
-- Missing OpenAI Admin key: Mac agent exits with a clear setup message and never sends fake live data.
-- OpenAI API failure: Mac agent sends an `api_error` snapshot with the current time.
+- Missing Codex auth file or ChatGPT token: Mac agent exits with a clear setup message and never sends fake live data.
+- Codex usage request failure: Mac agent sends an `api_error` snapshot with the current time.
 - Serial port unavailable: Mac agent lists detected `/dev/cu.*` candidates.
 - Stale data on device: firmware displays `STALE` when no snapshot arrives for more than 5 minutes.
 - Bad JSON: firmware ignores the line and keeps the last valid snapshot.
@@ -115,9 +126,11 @@ Landscape layout:
 
 Host agent tests:
 
-- Month window uses local Asia/Shanghai dates unless configured otherwise.
-- OpenAI API response parsing handles empty buckets, multiple result rows, and missing optional token fields.
-- Cost parsing computes current month and current day totals from official cost buckets.
+- Codex auth parsing reads `tokens.access_token` without logging secrets.
+- Usage response parsing handles primary and secondary windows.
+- Remaining percent is computed as `100 - used_percent` and clamped between 0 and 100.
+- Window labels map 300 minutes to `5H LIMIT` and 10080 minutes to `WEEK LIMIT`.
+- Reset labels use local Asia/Shanghai dates and times.
 - Serial message formatting produces one compact JSON object per line.
 
 Firmware tests/build checks:
@@ -130,12 +143,12 @@ Manual verification:
 
 - Flash firmware to the detected ESP32-S3 serial device.
 - Run host agent with mock data and confirm UI appears.
-- Run host agent with a real OpenAI Admin key.
+- Run host agent with the existing local Codex ChatGPT login token.
 - Confirm the device updates at startup and then once per minute.
 
 ## Non-Goals
 
-- Store OpenAI credentials on the ESP32.
+- Store Codex or ChatGPT credentials on the ESP32.
 - Use Wi-Fi for the first version.
-- Invent an account-balance or remaining-quota number when no official source is available.
+- Display OpenAI API billing/cost information.
 - Build a full settings UI on the device.
