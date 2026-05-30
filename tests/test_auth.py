@@ -33,6 +33,14 @@ class AuthTests(unittest.TestCase):
             with self.assertRaisesRegex(AuthError, "valid JSON object"):
                 read_access_token(auth_path)
 
+    def test_non_object_tokens_field_raises_clear_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            auth_path = Path(tmp) / "auth.json"
+            auth_path.write_text(json.dumps({"tokens": []}), encoding="utf-8")
+
+            with self.assertRaisesRegex(AuthError, "tokens"):
+                read_access_token(auth_path)
+
 
 if __name__ == "__main__":
     unittest.main()
