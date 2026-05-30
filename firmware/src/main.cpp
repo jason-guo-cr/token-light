@@ -23,9 +23,9 @@ static void setWindow(LimitWindow &window, const char *label, int remaining, int
 }
 
 static void setBootSnapshot() {
-  snapshot.date = "--/--";
-  snapshot.weekday = "---";
-  snapshot.time = "--:--";
+  snapshot.date = "BOOT";
+  snapshot.weekday = "DBG";
+  snapshot.time = "00:00";
   snapshot.status = "boot";
   snapshot.message = "WAITING FOR HOST";
   setWindow(snapshot.primary, "5H LIMIT", 0, 0, "--:--");
@@ -45,6 +45,7 @@ static LimitWindow readWindow(JsonObject obj) {
 static void applySnapshot(JsonDocument &doc) {
   const char *type = doc["type"] | "";
   if (strcmp(type, "snapshot") != 0) {
+    Serial.println("token-light: ignored non-snapshot JSON");
     return;
   }
 
@@ -59,12 +60,21 @@ static void applySnapshot(JsonDocument &doc) {
     snapshot.secondary = readWindow(doc["secondary"].as<JsonObject>());
   }
   snapshot.receivedAtMs = millis();
+  renderDashboard(*u8g2, snapshot, snapshot.receivedAtMs);
+  lastRenderMs = snapshot.receivedAtMs;
+  Serial.printf("token-light: snapshot status=%s time=%s primary=%d secondary=%d\n",
+                snapshot.status.c_str(),
+                snapshot.time.c_str(),
+                snapshot.primary.remainingPercent,
+                snapshot.secondary.remainingPercent);
 }
 
 static void processSerialLine(const String &line) {
+  Serial.printf("token-light: rx line length=%u\n", (unsigned)line.length());
   JsonDocument doc;
   DeserializationError error = deserializeJson(doc, line);
   if (error) {
+    Serial.printf("token-light: json error=%s\n", error.c_str());
     return;
   }
   applySnapshot(doc);
@@ -83,11 +93,16 @@ static void readSerialInput() {
 }
 
 void setup() {
+  Serial.setRxBufferSize(2048);
   Serial.begin(115200);
-  delay(300);
+  delay(1000);
+  Serial.println("token-light: boot");
   lcd.begin(0, U8G2_R1);
   u8g2 = lcd.getU8g2();
+  Serial.println("token-light: lcd ready");
   setBootSnapshot();
+  renderDashboard(*u8g2, snapshot, millis());
+  Serial.println("token-light: boot screen rendered");
 }
 
 void loop() {
