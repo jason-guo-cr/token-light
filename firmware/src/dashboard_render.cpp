@@ -22,8 +22,6 @@ static void drawMetricCard(U8G2 &u8g2, int x, int y, const LimitWindow &window) 
   char percent[8];
   snprintf(percent, sizeof(percent), "%d%%", window.remainingPercent);
   u8g2.drawStr(x + 14, y + 58, percent);
-  u8g2.setFont(u8g2_font_9x18B_tf);
-  u8g2.drawStr(x + 100, y + 56, "LEFT");
   drawProgress(u8g2, x + 14, y + 70, 140, window.remainingPercent);
 }
 
@@ -46,13 +44,13 @@ static void drawBattery(U8G2 &u8g2, int x, int y, int percent, bool charging) {
 }
 
 static void drawTokenUsage(U8G2 &u8g2, const DisplaySnapshot &snapshot) {
-  u8g2.drawFrame(196, 255, 184, 28);
-  u8g2.setFont(u8g2_font_6x13B_tf);
-  String line = "TOK D " + snapshot.tokenTodayLabel + " W " + snapshot.tokenWeekLabel;
+  u8g2.drawFrame(20, 255, 360, 28);
+  u8g2.setFont(u8g2_font_9x18B_tf);
+  String line = "TOKEN DAY " + snapshot.tokenTodayLabel + "  WEEK " + snapshot.tokenWeekLabel;
   if (snapshot.tokenTodayLabel.length() == 0 || snapshot.tokenWeekLabel.length() == 0) {
-    line = "TOK --";
+    line = "TOKEN WAITING";
   }
-  u8g2.drawStr(208, 274, line.c_str());
+  u8g2.drawStr(34, 276, line.c_str());
 }
 
 void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long nowMs) {
@@ -89,9 +87,6 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
     u8g2.drawStr(40, 202, snapshot.message.c_str());
   }
 
-  u8g2.drawFrame(20, 255, 160, 28);
-  u8g2.setFont(u8g2_font_9x18B_tf);
-  u8g2.drawStr(34, 276, stale ? "SYNC STALE" : "SYNC OK");
   drawTokenUsage(u8g2, snapshot);
 
   u8g2.sendBuffer();
