@@ -12,25 +12,27 @@ from token_light.battery import read_battery_snapshot
 from token_light.codex_usage import UsageFetchError, UsageParseError, fetch_usage, parse_usage
 from token_light.serial_writer import DEFAULT_PORT, detected_esp32_ports, detected_serial_ports, open_serial_port, write_snapshot
 from token_light.snapshot import build_error_snapshot, build_snapshot
+from token_light.token_usage import build_token_usage_snapshot
 
 
 def _load_mock(path: Path):
     return parse_usage(json.loads(path.read_text(encoding="utf-8")))
 
 
-def _snapshot_from_live(auth_file: Path, battery: dict | None) -> dict:
+def _snapshot_from_live(auth_file: Path, battery: dict | None, token_usage: dict | None) -> dict:
     token = read_access_token(auth_file)
-    return build_snapshot(fetch_usage(token), battery=battery)
+    return build_snapshot(fetch_usage(token), battery=battery, token_usage=token_usage)
 
 
 def _build_snapshot(args: argparse.Namespace) -> dict:
     battery = None if args.no_battery else read_battery_snapshot()
+    token_usage = None if args.no_token_usage else build_token_usage_snapshot()
     if args.mock:
-        return build_snapshot(_load_mock(args.mock), battery=battery)
+        return build_snapshot(_load_mock(args.mock), battery=battery, token_usage=token_usage)
     try:
-        return _snapshot_from_live(args.auth_file, battery)
+        return _snapshot_from_live(args.auth_file, battery, token_usage)
     except (AuthError, UsageFetchError, UsageParseError) as exc:
-        return build_error_snapshot(str(exc), battery=battery)
+        return build_error_snapshot(str(exc), battery=battery, token_usage=token_usage)
 
 
 def run(args: argparse.Namespace) -> int:
@@ -83,6 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--interval", type=int, default=60)
     parser.add_argument("--serial-settle", type=float, default=3.0)
     parser.add_argument("--no-battery", action="store_true")
+    parser.add_argument("--no-token-usage", action="store_true")
     parser.add_argument("--mock", type=Path)
     parser.add_argument("--stdout", action="store_true")
     parser.add_argument("--once", action="store_true")

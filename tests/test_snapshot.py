@@ -15,7 +15,12 @@ class SnapshotTests(unittest.TestCase):
         )
         now = datetime(2026, 5, 30, 15, 50, tzinfo=ZoneInfo("Asia/Shanghai"))
 
-        snapshot = build_snapshot(usage, now=now, battery={"percent": 61, "charging": False, "state": "discharging"})
+        snapshot = build_snapshot(
+            usage,
+            now=now,
+            battery={"percent": 61, "charging": False, "state": "discharging"},
+            token_usage={"today_total": 3_500_000, "week_total": 5_500_000, "today_label": "3.5M", "week_label": "5.5M"},
+        )
 
         self.assertEqual(snapshot["type"], "snapshot")
         self.assertEqual(snapshot["sent_at"], "2026-05-30T15:50:00+08:00")
@@ -37,6 +42,8 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["secondary"]["window_minutes"], 10080)
         self.assertEqual(snapshot["battery"]["percent"], 61)
         self.assertFalse(snapshot["battery"]["charging"])
+        self.assertEqual(snapshot["token_usage"]["today_label"], "3.5M")
+        self.assertEqual(snapshot["token_usage"]["week_label"], "5.5M")
         self.assertEqual(snapshot["status"], "live")
 
     def test_naive_now_is_treated_as_shanghai_local_time(self):

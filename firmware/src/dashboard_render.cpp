@@ -27,15 +27,6 @@ static void drawMetricCard(U8G2 &u8g2, int x, int y, const LimitWindow &window) 
   drawProgress(u8g2, x + 14, y + 70, 140, window.remainingPercent);
 }
 
-static void drawPixelPet(U8G2 &u8g2, int x, int y) {
-  u8g2.drawFrame(x + 4, y + 4, 22, 18);
-  u8g2.drawBox(x + 9, y + 10, 3, 3);
-  u8g2.drawBox(x + 19, y + 10, 3, 3);
-  u8g2.drawHLine(x + 11, y + 17, 9);
-  u8g2.drawPixel(x + 2, y + 8);
-  u8g2.drawPixel(x + 28, y + 8);
-}
-
 static void drawBattery(U8G2 &u8g2, int x, int y, int percent, bool charging) {
   int clamped = constrain(percent, 0, 100);
   u8g2.drawFrame(x, y, 24, 12);
@@ -52,6 +43,16 @@ static void drawBattery(U8G2 &u8g2, int x, int y, int percent, bool charging) {
     u8g2.drawPixel(x + 9, y + 7);
     u8g2.setDrawColor(1);
   }
+}
+
+static void drawTokenUsage(U8G2 &u8g2, const DisplaySnapshot &snapshot) {
+  u8g2.drawFrame(196, 255, 184, 28);
+  u8g2.setFont(u8g2_font_6x13B_tf);
+  String line = "TOK D " + snapshot.tokenTodayLabel + " W " + snapshot.tokenWeekLabel;
+  if (snapshot.tokenTodayLabel.length() == 0 || snapshot.tokenWeekLabel.length() == 0) {
+    line = "TOK --";
+  }
+  u8g2.drawStr(208, 274, line.c_str());
 }
 
 void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long nowMs) {
@@ -71,11 +72,11 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
     drawBattery(u8g2, 360, 14, snapshot.batteryPercent, snapshot.batteryCharging);
   }
 
-  u8g2.drawFrame(18, 42, 364, 78);
-  u8g2.drawFrame(30, 52, 340, 56);
-  u8g2.setFont(u8g2_font_logisoso62_tn);
+  u8g2.drawFrame(20, 40, 360, 72);
+  u8g2.drawFrame(34, 51, 332, 48);
+  u8g2.setFont(u8g2_font_logisoso50_tn);
   int clockWidth = u8g2.getStrWidth(snapshot.time.c_str());
-  u8g2.drawStr((LCD_WIDTH - clockWidth) / 2, 106, snapshot.time.c_str());
+  u8g2.drawStr((LCD_WIDTH - clockWidth) / 2, 100, snapshot.time.c_str());
 
   if (snapshot.status == "live") {
     drawMetricCard(u8g2, 20, 140, snapshot.primary);
@@ -89,10 +90,9 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
   }
 
   u8g2.drawFrame(20, 255, 160, 28);
-  u8g2.drawFrame(196, 255, 184, 28);
   u8g2.setFont(u8g2_font_9x18B_tf);
   u8g2.drawStr(34, 276, stale ? "SYNC STALE" : "SYNC OK");
-  drawPixelPet(u8g2, 330, 256);
+  drawTokenUsage(u8g2, snapshot);
 
   u8g2.sendBuffer();
 }

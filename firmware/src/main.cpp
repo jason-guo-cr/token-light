@@ -30,6 +30,8 @@ static void setBootSnapshot() {
   snapshot.message = "WAITING FOR HOST";
   snapshot.batteryPercent = -1;
   snapshot.batteryCharging = false;
+  snapshot.tokenTodayLabel = "";
+  snapshot.tokenWeekLabel = "";
   setWindow(snapshot.primary, "5H LIMIT", 0, 0, "--:--");
   setWindow(snapshot.secondary, "WEEK LIMIT", 0, 0, "--/--");
   snapshot.receivedAtMs = 0;
@@ -60,6 +62,11 @@ static void applySnapshot(JsonDocument &doc) {
   if (!battery.isNull()) {
     snapshot.batteryPercent = battery["percent"] | -1;
     snapshot.batteryCharging = battery["charging"] | false;
+  }
+  JsonObject tokenUsage = doc["token_usage"].as<JsonObject>();
+  if (!tokenUsage.isNull()) {
+    snapshot.tokenTodayLabel = tokenUsage["today_label"] | "";
+    snapshot.tokenWeekLabel = tokenUsage["week_label"] | "";
   }
 
   if (snapshot.status == "live") {

@@ -17,6 +17,8 @@ struct DisplaySnapshot {
   String message = "";
   int batteryPercent = -1;
   bool batteryCharging = false;
+  String tokenTodayLabel = "";
+  String tokenWeekLabel = "";
   LimitWindow primary;
   LimitWindow secondary;
   unsigned long receivedAtMs = 0;
