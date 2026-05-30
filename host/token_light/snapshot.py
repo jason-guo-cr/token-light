@@ -59,7 +59,7 @@ def _window_snapshot(window: UsageWindow, now: datetime) -> dict:
     }
 
 
-def build_snapshot(usage: UsageStatus, now: datetime | None = None) -> dict:
+def build_snapshot(usage: UsageStatus, now: datetime | None = None, battery: dict | None = None) -> dict:
     current = now or _now()
     snapshot = _base_snapshot(current)
     snapshot.update(
@@ -70,10 +70,14 @@ def build_snapshot(usage: UsageStatus, now: datetime | None = None) -> dict:
             "status": "live",
         }
     )
+    if battery is not None:
+        snapshot["battery"] = battery
     return snapshot
 
 
-def build_error_snapshot(message: str, now: datetime | None = None) -> dict:
+def build_error_snapshot(message: str, now: datetime | None = None, battery: dict | None = None) -> dict:
     snapshot = _base_snapshot(now or _now())
     snapshot.update({"status": "api_error", "message": message})
+    if battery is not None:
+        snapshot["battery"] = battery
     return snapshot

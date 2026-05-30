@@ -15,7 +15,7 @@ class SnapshotTests(unittest.TestCase):
         )
         now = datetime(2026, 5, 30, 15, 50, tzinfo=ZoneInfo("Asia/Shanghai"))
 
-        snapshot = build_snapshot(usage, now=now)
+        snapshot = build_snapshot(usage, now=now, battery={"percent": 61, "charging": False, "state": "discharging"})
 
         self.assertEqual(snapshot["type"], "snapshot")
         self.assertEqual(snapshot["sent_at"], "2026-05-30T15:50:00+08:00")
@@ -35,6 +35,8 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["secondary"]["reset_label"], "05/31")
         self.assertEqual(snapshot["secondary"]["reset_at"], 1780217709)
         self.assertEqual(snapshot["secondary"]["window_minutes"], 10080)
+        self.assertEqual(snapshot["battery"]["percent"], 61)
+        self.assertFalse(snapshot["battery"]["charging"])
         self.assertEqual(snapshot["status"], "live")
 
     def test_naive_now_is_treated_as_shanghai_local_time(self):
@@ -54,7 +56,11 @@ class SnapshotTests(unittest.TestCase):
     def test_error_snapshot_keeps_time_and_message(self):
         now = datetime(2026, 5, 30, 15, 50, tzinfo=ZoneInfo("Asia/Shanghai"))
 
-        snapshot = build_error_snapshot("Codex usage request failed", now=now)
+        snapshot = build_error_snapshot(
+            "Codex usage request failed",
+            now=now,
+            battery={"percent": 61, "charging": False, "state": "discharging"},
+        )
 
         self.assertEqual(snapshot["type"], "snapshot")
         self.assertEqual(snapshot["sent_at"], "2026-05-30T15:50:00+08:00")
@@ -62,6 +68,7 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["weekday"], "SAT")
         self.assertEqual(snapshot["status"], "api_error")
         self.assertEqual(snapshot["message"], "Codex usage request failed")
+        self.assertEqual(snapshot["battery"]["percent"], 61)
         self.assertEqual(snapshot["time"], "15:50")
 
 

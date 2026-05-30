@@ -28,6 +28,8 @@ static void setBootSnapshot() {
   snapshot.time = "00:00";
   snapshot.status = "boot";
   snapshot.message = "WAITING FOR HOST";
+  snapshot.batteryPercent = -1;
+  snapshot.batteryCharging = false;
   setWindow(snapshot.primary, "5H LIMIT", 0, 0, "--:--");
   setWindow(snapshot.secondary, "WEEK LIMIT", 0, 0, "--/--");
   snapshot.receivedAtMs = 0;
@@ -54,6 +56,11 @@ static void applySnapshot(JsonDocument &doc) {
   snapshot.time = doc["time"] | snapshot.time;
   snapshot.status = doc["status"] | "api_error";
   snapshot.message = doc["message"] | "";
+  JsonObject battery = doc["battery"].as<JsonObject>();
+  if (!battery.isNull()) {
+    snapshot.batteryPercent = battery["percent"] | -1;
+    snapshot.batteryCharging = battery["charging"] | false;
+  }
 
   if (snapshot.status == "live") {
     snapshot.primary = readWindow(doc["primary"].as<JsonObject>());

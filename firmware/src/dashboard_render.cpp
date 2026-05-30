@@ -34,6 +34,24 @@ static void drawPixelPet(U8G2 &u8g2, int x, int y) {
   u8g2.drawPixel(x + 28, y + 8);
 }
 
+static void drawBattery(U8G2 &u8g2, int x, int y, int percent, bool charging) {
+  int clamped = constrain(percent, 0, 100);
+  u8g2.drawFrame(x, y, 24, 12);
+  u8g2.drawBox(x + 24, y + 4, 3, 4);
+  int fill = 20 * clamped / 100;
+  u8g2.drawBox(x + 2, y + 2, fill, 8);
+  if (charging) {
+    u8g2.setDrawColor(0);
+    u8g2.drawPixel(x + 10, y + 3);
+    u8g2.drawPixel(x + 9, y + 4);
+    u8g2.drawPixel(x + 11, y + 4);
+    u8g2.drawPixel(x + 10, y + 5);
+    u8g2.drawPixel(x + 10, y + 6);
+    u8g2.drawPixel(x + 9, y + 7);
+    u8g2.setDrawColor(1);
+  }
+}
+
 void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long nowMs) {
   bool stale = snapshot.receivedAtMs > 0 && (nowMs - snapshot.receivedAtMs) > 300000UL;
   u8g2.clearBuffer();
@@ -43,7 +61,13 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
   String topLeft = snapshot.date + " " + snapshot.weekday;
   u8g2.drawStr(16, 28, topLeft.c_str());
   const char *state = stale ? "STALE" : (snapshot.status == "live" ? "LIVE" : "WAIT");
-  u8g2.drawStr(310, 28, state);
+  u8g2.drawStr(246, 28, state);
+  if (snapshot.batteryPercent >= 0) {
+    char batteryText[8];
+    snprintf(batteryText, sizeof(batteryText), "%d%%", snapshot.batteryPercent);
+    u8g2.drawStr(304, 28, batteryText);
+    drawBattery(u8g2, 360, 14, snapshot.batteryPercent, snapshot.batteryCharging);
+  }
 
   u8g2.drawFrame(14, 44, 372, 88);
   u8g2.drawFrame(26, 56, 348, 64);

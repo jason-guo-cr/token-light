@@ -15,6 +15,8 @@ struct DisplaySnapshot {
   String time = "--:--";
   String status = "boot";
   String message = "";
+  int batteryPercent = -1;
+  bool batteryCharging = false;
   LimitWindow primary;
   LimitWindow secondary;
   unsigned long receivedAtMs = 0;
