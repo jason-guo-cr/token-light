@@ -21,9 +21,13 @@ class WeatherParseError(RuntimeError):
 
 def _condition_for_code(code: int) -> str:
     if code == 0:
-        return "clear"
-    if code in {1, 2, 3, 45, 48}:
+        return "sun"
+    if code in {1, 2}:
+        return "pcld"
+    if code == 3:
         return "cloud"
+    if code in {45, 48}:
+        return "fog"
     if code in {51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82}:
         return "rain"
     if code in {71, 73, 75, 77, 85, 86}:
@@ -31,6 +35,19 @@ def _condition_for_code(code: int) -> str:
     if code in {95, 96, 99}:
         return "storm"
     return "weather"
+
+
+def _display_condition(condition: str) -> str:
+    labels = {
+        "sun": "SUN",
+        "pcld": "PCLD",
+        "cloud": "CLD",
+        "fog": "FOG",
+        "rain": "RAIN",
+        "snow": "SNOW",
+        "storm": "STORM",
+    }
+    return labels.get(condition, "WX")
 
 
 def parse_weather(payload: Any, label: str) -> dict:
@@ -49,12 +66,15 @@ def parse_weather(payload: Any, label: str) -> dict:
         raise WeatherParseError("current weather contains invalid values") from exc
 
     rounded = round(temperature)
+    condition = _condition_for_code(weather_code)
+    display_condition = _display_condition(condition)
     return {
         "label": label,
         "temperature_c": rounded,
         "weather_code": weather_code,
-        "condition": _condition_for_code(weather_code),
-        "display": f"{label} {rounded}C",
+        "condition": condition,
+        "condition_label": display_condition,
+        "display": f"{label} {display_condition} {rounded}C",
     }
 
 

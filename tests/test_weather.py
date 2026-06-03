@@ -14,9 +14,23 @@ class WeatherTests(unittest.TestCase):
 
         weather = parse_weather(payload, "BJ")
 
-        self.assertEqual(weather["display"], "BJ 24C")
+        self.assertEqual(weather["display"], "BJ PCLD 24C")
         self.assertEqual(weather["temperature_c"], 24)
-        self.assertEqual(weather["condition"], "cloud")
+        self.assertEqual(weather["condition"], "pcld")
+        self.assertEqual(weather["condition_label"], "PCLD")
+
+    def test_parse_weather_formats_rain_display(self):
+        payload = {
+            "current": {
+                "temperature_2m": 18.2,
+                "weather_code": 61,
+            }
+        }
+
+        weather = parse_weather(payload, "BJ")
+
+        self.assertEqual(weather["display"], "BJ RAIN 18C")
+        self.assertEqual(weather["condition"], "rain")
 
     def test_parse_weather_rejects_missing_current(self):
         with self.assertRaises(WeatherParseError):
