@@ -80,7 +80,7 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
   u8g2.drawStr((LCD_WIDTH - clockWidth) / 2, 100, snapshot.time.c_str());
 
   if (snapshot.limitUpdatedLabel.length() > 0) {
-    String updated = "LIMIT UPDATED " + snapshot.limitUpdatedLabel;
+    String updated = "QUERY " + snapshot.limitUpdatedLabel;
     u8g2.setFont(u8g2_font_6x13B_tf);
     int updatedWidth = u8g2.getStrWidth(updated.c_str());
     u8g2.drawStr((LCD_WIDTH - updatedWidth) / 2, 130, updated.c_str());

@@ -7,7 +7,7 @@ The board currently shows:
 - Date, weekday, live/stale status, and Mac battery.
 - Beijing weather, for example `BJ CLD 29C`.
 - Current time.
-- `LIMIT UPDATED HH:MM`, the last successful Codex usage-limit API update.
+- `QUERY HH:MM`, the last successful Codex usage-limit API query.
 - 5-hour and weekly Codex usage-limit remaining percentages.
 - Local Codex token consumption for today and this week.
 
@@ -142,7 +142,7 @@ It calls the ChatGPT backend usage endpoint and parses:
 - Secondary window: shown as `WEEK LIMIT`
 - Reset labels in each card's top-right corner
 
-`LIMIT UPDATED HH:MM` is the last successful usage-limit API fetch time.
+`QUERY HH:MM` is the last successful usage-limit API query time.
 
 ### Token Consumption
 
