@@ -7,3 +7,4 @@ __pycache__/
 firmware/.pio/
 firmware/.vscode/
 vendor/
+.idea
