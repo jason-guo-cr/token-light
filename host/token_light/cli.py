@@ -82,7 +82,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Sync Codex usage-limit snapshots to Token Light.")
     parser.add_argument("--auth-file", type=Path, default=Path(os.environ.get("TOKEN_LIGHT_AUTH_FILE", DEFAULT_AUTH_FILE)))
     parser.add_argument("--port", default=os.environ.get("TOKEN_LIGHT_PORT", DEFAULT_PORT))
-    parser.add_argument("--interval", type=int, default=60)
+    parser.add_argument("--interval", type=int, default=600)
     parser.add_argument("--serial-settle", type=float, default=3.0)
     parser.add_argument("--no-battery", action="store_true")
     parser.add_argument("--no-token-usage", action="store_true")
