@@ -5,18 +5,27 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 from token_light.auth import DEFAULT_AUTH_FILE, AuthError, read_access_token
 from token_light.battery import read_battery_snapshot
 from token_light.codex_usage import UsageFetchError, UsageParseError, fetch_usage, parse_usage
 from token_light.serial_writer import DEFAULT_PORT, detected_esp32_ports, detected_serial_ports, open_serial_port, write_snapshot
-from token_light.snapshot import build_error_snapshot, build_snapshot
+from token_light.snapshot import LOCAL_TZ, build_error_snapshot, build_snapshot
 from token_light.token_usage import build_token_usage_snapshot
+from token_light.weather import WeatherFetchError, fetch_weather
 
 
 def _load_mock(path: Path):
     return parse_usage(json.loads(path.read_text(encoding="utf-8")))
+
+
+def _env_float(name: str) -> float | None:
+    value = os.environ.get(name)
+    if value is None or value == "":
+        return None
+    return float(value)
 
 
 def _usage_from_live(auth_file: Path):
@@ -34,6 +43,7 @@ class UsagePoller:
     def __init__(self) -> None:
         self.usage = None
         self.error: Exception | None = None
+        self.updated_at: datetime | None = None
         self.next_fetch_at = 0.0
 
     def get(self, args: argparse.Namespace, now_monotonic: float):
@@ -41,33 +51,69 @@ class UsagePoller:
             try:
                 self.usage = _read_usage(args)
                 self.error = None
+                self.updated_at = datetime.now(tz=LOCAL_TZ)
             except (AuthError, UsageFetchError, UsageParseError) as exc:
                 self.error = exc
             self.next_fetch_at = now_monotonic + args.usage_interval
-        return self.usage, self.error
+        return self.usage, self.error, self.updated_at
+
+
+class WeatherPoller:
+    def __init__(self) -> None:
+        self.weather: dict | None = None
+        self.next_fetch_at = 0.0
+
+    def get(self, args: argparse.Namespace, now_monotonic: float) -> dict | None:
+        if args.weather_lat is None or args.weather_lon is None:
+            return None
+        if now_monotonic >= self.next_fetch_at:
+            try:
+                self.weather = fetch_weather(args.weather_lat, args.weather_lon, args.weather_label)
+            except WeatherFetchError:
+                pass
+            self.next_fetch_at = now_monotonic + args.weather_interval
+        return self.weather
 
 
 def _build_snapshot(
     args: argparse.Namespace,
     usage_poller: UsagePoller | None = None,
+    weather_poller: WeatherPoller | None = None,
     now_monotonic: float | None = None,
 ) -> dict:
     battery = None if args.no_battery else read_battery_snapshot()
     token_usage = None if args.no_token_usage else build_token_usage_snapshot()
+    monotonic = time.monotonic() if now_monotonic is None else now_monotonic
     if usage_poller is None:
         usage_poller = UsagePoller()
-    usage, error = usage_poller.get(args, time.monotonic() if now_monotonic is None else now_monotonic)
+    if weather_poller is None:
+        weather_poller = WeatherPoller()
+    usage, error, limit_updated_at = usage_poller.get(args, monotonic)
+    weather = None if args.no_weather else weather_poller.get(args, monotonic)
     if usage is not None:
-        return build_snapshot(usage, battery=battery, token_usage=token_usage)
-    return build_error_snapshot(str(error), battery=battery, token_usage=token_usage)
+        return build_snapshot(
+            usage,
+            battery=battery,
+            token_usage=token_usage,
+            limit_updated_at=limit_updated_at,
+            weather=weather,
+        )
+    return build_error_snapshot(
+        str(error),
+        battery=battery,
+        token_usage=token_usage,
+        limit_updated_at=limit_updated_at,
+        weather=weather,
+    )
 
 
 def run(args: argparse.Namespace) -> int:
     serial_port = None
     usage_poller = UsagePoller()
+    weather_poller = WeatherPoller()
 
     while True:
-        snapshot = _build_snapshot(args, usage_poller=usage_poller)
+        snapshot = _build_snapshot(args, usage_poller=usage_poller, weather_poller=weather_poller)
         if args.stdout:
             print(json.dumps(snapshot, separators=(",", ":"), ensure_ascii=True), flush=True)
         else:
@@ -112,9 +158,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", default=os.environ.get("TOKEN_LIGHT_PORT", DEFAULT_PORT))
     parser.add_argument("--interval", type=int, default=60)
     parser.add_argument("--usage-interval", type=int, default=600)
+    parser.add_argument("--weather-interval", type=int, default=1800)
+    parser.add_argument("--weather-lat", type=float, default=_env_float("TOKEN_LIGHT_WEATHER_LAT"))
+    parser.add_argument("--weather-lon", type=float, default=_env_float("TOKEN_LIGHT_WEATHER_LON"))
+    parser.add_argument("--weather-label", default=os.environ.get("TOKEN_LIGHT_WEATHER_LABEL", "BJ"))
     parser.add_argument("--serial-settle", type=float, default=3.0)
     parser.add_argument("--no-battery", action="store_true")
     parser.add_argument("--no-token-usage", action="store_true")
+    parser.add_argument("--no-weather", action="store_true")
     parser.add_argument("--mock", type=Path)
     parser.add_argument("--stdout", action="store_true")
     parser.add_argument("--once", action="store_true")

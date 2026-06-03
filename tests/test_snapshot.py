@@ -20,6 +20,8 @@ class SnapshotTests(unittest.TestCase):
             now=now,
             battery={"percent": 61, "charging": False, "state": "discharging"},
             token_usage={"today_total": 3_500_000, "week_total": 5_500_000, "today_label": "3.5M", "week_label": "5.5M"},
+            limit_updated_at=datetime(2026, 5, 30, 15, 42, tzinfo=ZoneInfo("Asia/Shanghai")),
+            weather={"display": "BJ 24C", "temperature_c": 24},
         )
 
         self.assertEqual(snapshot["type"], "snapshot")
@@ -44,6 +46,8 @@ class SnapshotTests(unittest.TestCase):
         self.assertFalse(snapshot["battery"]["charging"])
         self.assertEqual(snapshot["token_usage"]["today_label"], "3.5M")
         self.assertEqual(snapshot["token_usage"]["week_label"], "5.5M")
+        self.assertEqual(snapshot["limit_updated_label"], "15:42")
+        self.assertEqual(snapshot["weather"]["display"], "BJ 24C")
         self.assertEqual(snapshot["status"], "live")
 
     def test_naive_now_is_treated_as_shanghai_local_time(self):
@@ -67,6 +71,8 @@ class SnapshotTests(unittest.TestCase):
             "Codex usage request failed",
             now=now,
             battery={"percent": 61, "charging": False, "state": "discharging"},
+            limit_updated_at=datetime(2026, 5, 30, 15, 42, tzinfo=ZoneInfo("Asia/Shanghai")),
+            weather={"display": "BJ 24C", "temperature_c": 24},
         )
 
         self.assertEqual(snapshot["type"], "snapshot")
@@ -77,6 +83,8 @@ class SnapshotTests(unittest.TestCase):
         self.assertEqual(snapshot["message"], "Codex usage request failed")
         self.assertEqual(snapshot["battery"]["percent"], 61)
         self.assertEqual(snapshot["time"], "15:50")
+        self.assertEqual(snapshot["limit_updated_label"], "15:42")
+        self.assertEqual(snapshot["weather"]["display"], "BJ 24C")
 
 
 if __name__ == "__main__":

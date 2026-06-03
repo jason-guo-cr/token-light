@@ -61,6 +61,9 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
   u8g2.setFont(u8g2_font_9x18B_tf);
   String topLeft = snapshot.date + " " + snapshot.weekday;
   u8g2.drawStr(16, 28, topLeft.c_str());
+  if (snapshot.weatherDisplay.length() > 0) {
+    u8g2.drawStr(134, 28, snapshot.weatherDisplay.c_str());
+  }
   const char *state = stale ? "STALE" : (snapshot.status == "live" ? "LIVE" : "WAIT");
   u8g2.drawStr(246, 28, state);
   if (snapshot.batteryPercent >= 0) {
@@ -75,6 +78,13 @@ void renderDashboard(U8G2 &u8g2, const DisplaySnapshot &snapshot, unsigned long 
   u8g2.setFont(u8g2_font_logisoso50_tn);
   int clockWidth = u8g2.getStrWidth(snapshot.time.c_str());
   u8g2.drawStr((LCD_WIDTH - clockWidth) / 2, 100, snapshot.time.c_str());
+
+  if (snapshot.limitUpdatedLabel.length() > 0) {
+    String updated = "LIMIT UPDATED " + snapshot.limitUpdatedLabel;
+    u8g2.setFont(u8g2_font_6x13B_tf);
+    int updatedWidth = u8g2.getStrWidth(updated.c_str());
+    u8g2.drawStr((LCD_WIDTH - updatedWidth) / 2, 130, updated.c_str());
+  }
 
   if (snapshot.status == "live") {
     drawMetricCard(u8g2, 20, 140, snapshot.primary);

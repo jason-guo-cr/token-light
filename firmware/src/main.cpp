@@ -32,6 +32,8 @@ static void setBootSnapshot() {
   snapshot.batteryCharging = false;
   snapshot.tokenTodayLabel = "";
   snapshot.tokenWeekLabel = "";
+  snapshot.limitUpdatedLabel = "";
+  snapshot.weatherDisplay = "";
   setWindow(snapshot.primary, "5H LIMIT", 0, 0, "--:--");
   setWindow(snapshot.secondary, "WEEK LIMIT", 0, 0, "--/--");
   snapshot.receivedAtMs = 0;
@@ -58,6 +60,7 @@ static void applySnapshot(JsonDocument &doc) {
   snapshot.time = doc["time"] | snapshot.time;
   snapshot.status = doc["status"] | "api_error";
   snapshot.message = doc["message"] | "";
+  snapshot.limitUpdatedLabel = doc["limit_updated_label"] | snapshot.limitUpdatedLabel;
   JsonObject battery = doc["battery"].as<JsonObject>();
   if (!battery.isNull()) {
     snapshot.batteryPercent = battery["percent"] | -1;
@@ -67,6 +70,10 @@ static void applySnapshot(JsonDocument &doc) {
   if (!tokenUsage.isNull()) {
     snapshot.tokenTodayLabel = tokenUsage["today_label"] | "";
     snapshot.tokenWeekLabel = tokenUsage["week_label"] | "";
+  }
+  JsonObject weather = doc["weather"].as<JsonObject>();
+  if (!weather.isNull()) {
+    snapshot.weatherDisplay = weather["display"] | "";
   }
 
   if (snapshot.status == "live") {

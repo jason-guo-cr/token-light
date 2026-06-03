@@ -64,6 +64,8 @@ def build_snapshot(
     now: datetime | None = None,
     battery: dict | None = None,
     token_usage: dict | None = None,
+    limit_updated_at: datetime | None = None,
+    weather: dict | None = None,
 ) -> dict:
     current = now or _now()
     snapshot = _base_snapshot(current)
@@ -79,6 +81,10 @@ def build_snapshot(
         snapshot["battery"] = battery
     if token_usage is not None:
         snapshot["token_usage"] = token_usage
+    if limit_updated_at is not None:
+        snapshot["limit_updated_label"] = _as_local(limit_updated_at).strftime("%H:%M")
+    if weather is not None:
+        snapshot["weather"] = weather
     return snapshot
 
 
@@ -87,6 +93,8 @@ def build_error_snapshot(
     now: datetime | None = None,
     battery: dict | None = None,
     token_usage: dict | None = None,
+    limit_updated_at: datetime | None = None,
+    weather: dict | None = None,
 ) -> dict:
     snapshot = _base_snapshot(now or _now())
     snapshot.update({"status": "api_error", "message": message})
@@ -94,4 +102,8 @@ def build_error_snapshot(
         snapshot["battery"] = battery
     if token_usage is not None:
         snapshot["token_usage"] = token_usage
+    if limit_updated_at is not None:
+        snapshot["limit_updated_label"] = _as_local(limit_updated_at).strftime("%H:%M")
+    if weather is not None:
+        snapshot["weather"] = weather
     return snapshot

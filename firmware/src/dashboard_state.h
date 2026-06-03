@@ -19,6 +19,8 @@ struct DisplaySnapshot {
   bool batteryCharging = false;
   String tokenTodayLabel = "";
   String tokenWeekLabel = "";
+  String limitUpdatedLabel = "";
+  String weatherDisplay = "";
   LimitWindow primary;
   LimitWindow secondary;
   unsigned long receivedAtMs = 0;
