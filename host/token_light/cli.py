@@ -19,27 +19,55 @@ def _load_mock(path: Path):
     return parse_usage(json.loads(path.read_text(encoding="utf-8")))
 
 
-def _snapshot_from_live(auth_file: Path, battery: dict | None, token_usage: dict | None) -> dict:
+def _usage_from_live(auth_file: Path):
     token = read_access_token(auth_file)
-    return build_snapshot(fetch_usage(token), battery=battery, token_usage=token_usage)
+    return fetch_usage(token)
 
 
-def _build_snapshot(args: argparse.Namespace) -> dict:
+def _read_usage(args: argparse.Namespace):
+    if args.mock:
+        return _load_mock(args.mock)
+    return _usage_from_live(args.auth_file)
+
+
+class UsagePoller:
+    def __init__(self) -> None:
+        self.usage = None
+        self.error: Exception | None = None
+        self.next_fetch_at = 0.0
+
+    def get(self, args: argparse.Namespace, now_monotonic: float):
+        if now_monotonic >= self.next_fetch_at:
+            try:
+                self.usage = _read_usage(args)
+                self.error = None
+            except (AuthError, UsageFetchError, UsageParseError) as exc:
+                self.error = exc
+            self.next_fetch_at = now_monotonic + args.usage_interval
+        return self.usage, self.error
+
+
+def _build_snapshot(
+    args: argparse.Namespace,
+    usage_poller: UsagePoller | None = None,
+    now_monotonic: float | None = None,
+) -> dict:
     battery = None if args.no_battery else read_battery_snapshot()
     token_usage = None if args.no_token_usage else build_token_usage_snapshot()
-    if args.mock:
-        return build_snapshot(_load_mock(args.mock), battery=battery, token_usage=token_usage)
-    try:
-        return _snapshot_from_live(args.auth_file, battery, token_usage)
-    except (AuthError, UsageFetchError, UsageParseError) as exc:
-        return build_error_snapshot(str(exc), battery=battery, token_usage=token_usage)
+    if usage_poller is None:
+        usage_poller = UsagePoller()
+    usage, error = usage_poller.get(args, time.monotonic() if now_monotonic is None else now_monotonic)
+    if usage is not None:
+        return build_snapshot(usage, battery=battery, token_usage=token_usage)
+    return build_error_snapshot(str(error), battery=battery, token_usage=token_usage)
 
 
 def run(args: argparse.Namespace) -> int:
     serial_port = None
+    usage_poller = UsagePoller()
 
     while True:
-        snapshot = _build_snapshot(args)
+        snapshot = _build_snapshot(args, usage_poller=usage_poller)
         if args.stdout:
             print(json.dumps(snapshot, separators=(",", ":"), ensure_ascii=True), flush=True)
         else:
@@ -82,7 +110,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Sync Codex usage-limit snapshots to Token Light.")
     parser.add_argument("--auth-file", type=Path, default=Path(os.environ.get("TOKEN_LIGHT_AUTH_FILE", DEFAULT_AUTH_FILE)))
     parser.add_argument("--port", default=os.environ.get("TOKEN_LIGHT_PORT", DEFAULT_PORT))
-    parser.add_argument("--interval", type=int, default=600)
+    parser.add_argument("--interval", type=int, default=60)
+    parser.add_argument("--usage-interval", type=int, default=600)
     parser.add_argument("--serial-settle", type=float, default=3.0)
     parser.add_argument("--no-battery", action="store_true")
     parser.add_argument("--no-token-usage", action="store_true")
