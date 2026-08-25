@@ -30,6 +30,10 @@ class SerialWriterTests(unittest.TestCase):
         self.assertEqual(fake.data, b'{"type":"snapshot"}\n')
         self.assertTrue(fake.flushed)
 
+    def test_snapshot_over_protocol_limit_is_rejected(self):
+        with self.assertRaisesRegex(ValueError, "protocol limit"):
+            encode_snapshot_line({"type": "snapshot", "message": "x" * 1200})
+
     def test_resolve_auto_port_uses_detected_esp32_port(self):
         with patch("token_light.serial_writer.detected_esp32_ports", return_value=["/dev/cu.usbmodem1234"]):
             self.assertEqual(resolve_serial_port("auto"), "/dev/cu.usbmodem1234")

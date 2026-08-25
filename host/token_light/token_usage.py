@@ -16,10 +16,11 @@ def _session_id(path: Path) -> str:
     return match.group(1) if match else path.stem
 
 
-def _iter_token_events(codex_home: Path, tz: ZoneInfo):
+def iter_token_count_events(codex_home: Path | str | None = None):
+    home = Path(codex_home).expanduser() if codex_home is not None else Path.home() / ".codex"
     seen = set()
     for root_name in ("sessions", "archived_sessions"):
-        root = codex_home / root_name
+        root = home / root_name
         if not root.exists():
             continue
         for path in root.rglob("*.jsonl"):
@@ -54,16 +55,31 @@ def _iter_token_events(codex_home: Path, tz: ZoneInfo):
                         continue
                     seen.add(key)
                     try:
-                        event_time = datetime.fromisoformat(timestamp.replace("Z", "+00:00")).astimezone(tz)
-                    except ValueError:
+                        datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                    except (TypeError, ValueError):
                         continue
                     yield {
-                        "date": event_time.date(),
-                        "total": usage.get("total_tokens") or 0,
+                        "timestamp": timestamp,
+                        "total_tokens": usage.get("total_tokens") or 0,
                         "input": usage.get("input_tokens") or 0,
                         "cached_input": usage.get("cached_input_tokens") or 0,
                         "output": usage.get("output_tokens") or 0,
                     }
+
+
+def _iter_token_events(codex_home: Path, tz: ZoneInfo):
+    for event in iter_token_count_events(codex_home):
+        try:
+            event_time = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00")).astimezone(tz)
+        except (TypeError, ValueError):
+            continue
+        yield {
+            "date": event_time.date(),
+            "total": event["total_tokens"],
+            "input": event["input"],
+            "cached_input": event["cached_input"],
+            "output": event["output"],
+        }
 
 
 def _format_compact(value: int) -> str:

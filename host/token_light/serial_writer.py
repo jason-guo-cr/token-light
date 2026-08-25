@@ -9,10 +9,14 @@ DEFAULT_PORT = "auto"
 BAUD_RATE = 115200
 ESPRESSIF_VID = 0x303A
 ESP32_USB_JTAG_PID = 0x1001
+MAX_SNAPSHOT_BYTES = 1200
 
 
 def encode_snapshot_line(snapshot: dict[str, Any]) -> bytes:
-    return (json.dumps(snapshot, separators=(",", ":"), ensure_ascii=True) + "\n").encode("utf-8")
+    encoded = json.dumps(snapshot, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
+    if len(encoded) >= MAX_SNAPSHOT_BYTES:
+        raise ValueError(f"snapshot exceeds {MAX_SNAPSHOT_BYTES - 1} byte protocol limit")
+    return encoded + b"\n"
 
 
 def write_snapshot(port, snapshot: dict[str, Any]) -> None:

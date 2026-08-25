@@ -8,11 +8,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+from token_light.activity import read_codex_activity
 from token_light.battery import read_battery_snapshot
+from token_light.burn_rate import build_burn_rate_snapshot, load_quota_history
 from token_light.codex_usage import UsageFetchError, UsageParseError, fetch_usage, parse_usage
+from token_light.companion import build_companion_payload
+from token_light.quota_history import record_quota_sample
 from token_light.serial_writer import DEFAULT_PORT, detected_esp32_ports, detected_serial_ports, open_serial_port, write_snapshot
-from token_light.snapshot import LOCAL_TZ, build_error_snapshot, build_snapshot
-from token_light.token_usage import build_token_usage_snapshot
+from token_light.snapshot import LOCAL_TZ, build_error_snapshot, build_snapshot, display_window
+from token_light.token_usage import build_token_usage_snapshot, iter_token_count_events
 from token_light.weather import WeatherFetchError, fetch_weather
 
 
@@ -43,6 +47,7 @@ class UsagePoller:
         self.error: Exception | None = None
         self.updated_at: datetime | None = None
         self.next_fetch_at = 0.0
+        self.history_recorded_at: datetime | None = None
 
     def get(self, args: argparse.Namespace, now_monotonic: float):
         if now_monotonic >= self.next_fetch_at:
@@ -79,8 +84,16 @@ def _build_snapshot(
     weather_poller: WeatherPoller | None = None,
     now_monotonic: float | None = None,
 ) -> dict:
+    now = datetime.now(tz=LOCAL_TZ)
+    codex_home = args.codex_home
     battery = None if args.no_battery else read_battery_snapshot()
-    token_usage = None if args.no_token_usage else build_token_usage_snapshot()
+    token_events = [] if args.no_token_usage else list(iter_token_count_events(codex_home))
+    token_usage = (
+        None
+        if args.no_token_usage
+        else build_token_usage_snapshot(codex_home=codex_home, now=now)
+    )
+    activity = read_codex_activity(codex_home, now)
     monotonic = time.monotonic() if now_monotonic is None else now_monotonic
     if usage_poller is None:
         usage_poller = UsagePoller()
@@ -88,25 +101,69 @@ def _build_snapshot(
         weather_poller = WeatherPoller()
     usage, error, limit_updated_at = usage_poller.get(args, monotonic)
     weather = None if args.no_weather else weather_poller.get(args, monotonic)
+    current_window = None
+    remaining_percent = None
+    if usage is not None:
+        selected = display_window(usage)
+        current_window = {
+            "limit_id": selected.limit_id,
+            "reset_at": selected.reset_at,
+            "used_percent": selected.used_percent,
+        }
+        remaining_percent = selected.remaining_percent
+        if (
+            error is None
+            and limit_updated_at is not None
+            and usage_poller.history_recorded_at != limit_updated_at
+            and args.mock is None
+        ):
+            record_quota_sample(args.quota_history, current_window, limit_updated_at)
+            usage_poller.history_recorded_at = limit_updated_at
+
+    quota_history = [] if args.mock is not None else load_quota_history(args.quota_history)
+    metrics = build_burn_rate_snapshot(token_events, quota_history, current_window, now)
+    if token_usage is not None:
+        token_usage.update({key: metrics[key] for key in ("burn_60m", "burn_label")})
+    forecast = {
+        key: metrics[key]
+        for key in (
+            "pace",
+            "pace_label",
+            "quota_points_per_hour",
+            "projected_used_percent",
+            "forecast_label",
+        )
+    }
+    companion = build_companion_payload(activity, remaining_percent=remaining_percent)
+    quiet = (now.hour >= 22 or now.hour < 8) and not args.audio_always
+    audio = {"enabled": not args.no_audio, "quiet": quiet}
     if usage is not None:
         status = "cached" if error is not None else "live"
         warning = getattr(error, "display_message", "USAGE DATA CHANGED") if error is not None else None
         return build_snapshot(
             usage,
+            now=now,
             battery=battery,
             token_usage=token_usage,
             limit_updated_at=limit_updated_at,
             weather=weather,
             status=status,
             warning=warning,
+            companion=companion,
+            forecast=forecast,
+            audio=audio,
         )
     display_message = getattr(error, "display_message", "USAGE DATA CHANGED")
     return build_error_snapshot(
         display_message,
+        now=now,
         battery=battery,
         token_usage=token_usage,
         limit_updated_at=limit_updated_at,
         weather=weather,
+        companion=companion,
+        forecast=forecast,
+        audio=audio,
     )
 
 
@@ -166,6 +223,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--weather-lon", type=float, default=_env_float("TOKEN_LIGHT_WEATHER_LON"))
     parser.add_argument("--weather-label", default=os.environ.get("TOKEN_LIGHT_WEATHER_LABEL", "BJ"))
     parser.add_argument("--serial-settle", type=float, default=3.0)
+    parser.add_argument("--codex-home", type=Path, default=Path.home() / ".codex")
+    parser.add_argument(
+        "--quota-history",
+        type=Path,
+        default=Path.home() / ".cache" / "token-light" / "quota-history.jsonl",
+    )
+    parser.add_argument("--audio-always", action="store_true")
+    parser.add_argument("--no-audio", action="store_true")
     parser.add_argument("--no-battery", action="store_true")
     parser.add_argument("--no-token-usage", action="store_true")
     parser.add_argument("--no-weather", action="store_true")

@@ -48,6 +48,37 @@ class CompanionTests(unittest.TestCase):
             },
         )
 
+    def test_completion_celebration_expires_after_thirty_seconds(self):
+        activity = {
+            "state": "done",
+            "label": "DONE",
+            "detail": "TASK COMPLETE",
+            "elapsed_seconds": 92,
+            "completion_seq": 7,
+            "_completion_age_seconds": 31,
+        }
+
+        result = build_companion_payload(activity, remaining_percent=80)
+
+        self.assertEqual(result["pet"]["pose"], "sleep")
+        self.assertNotIn("_completion_age_seconds", result["activity"])
+
+    def test_payload_drops_unapproved_private_fields_and_text(self):
+        activity = {
+            "state": "testing",
+            "label": "PRIVATE COMMAND",
+            "detail": "/secret/project",
+            "elapsed_seconds": 92,
+            "completion_seq": 7,
+            "prompt": "private prompt",
+        }
+
+        result = build_companion_payload(activity, remaining_percent=80)
+
+        self.assertEqual(result["activity"]["label"], "TESTING")
+        self.assertEqual(result["activity"]["detail"], "TEST RUN")
+        self.assertNotIn("prompt", result["activity"])
+
 
 if __name__ == "__main__":
     unittest.main()

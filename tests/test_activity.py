@@ -106,6 +106,17 @@ class ActivityTests(unittest.TestCase):
 
         self.assertEqual(result["state"], "thinking")
 
+    def test_future_completion_does_not_advance_sequence(self):
+        result = self._read(
+            [
+                self._event("2026-08-25T10:59:50Z", "task_started"),
+                self._event("2026-08-25T11:01:00Z", "task_complete"),
+            ]
+        )
+
+        self.assertEqual(result["state"], "thinking")
+        self.assertEqual(result["completion_seq"], 0)
+
     def test_newest_event_timestamp_wins_across_active_and_archived_logs(self):
         with tempfile.TemporaryDirectory() as tmp:
             codex_home = Path(tmp)

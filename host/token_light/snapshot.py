@@ -77,7 +77,7 @@ def _window_snapshot(window: UsageWindow, now: datetime) -> dict:
     }
 
 
-def _display_window(usage: UsageStatus) -> UsageWindow:
+def display_window(usage: UsageStatus) -> UsageWindow:
     general = [window for window in usage.windows if window.limit_id == "codex"]
     candidates = general or list(usage.windows)
     return max(candidates, key=lambda window: window.window_minutes)
@@ -92,9 +92,12 @@ def build_snapshot(
     weather: dict | None = None,
     status: str = "live",
     warning: str | None = None,
+    companion: dict | None = None,
+    forecast: dict | None = None,
+    audio: dict | None = None,
 ) -> dict:
     current = now or _now()
-    primary = _window_snapshot(_display_window(usage), current)
+    primary = _window_snapshot(display_window(usage), current)
     snapshot = _base_snapshot(current)
     snapshot.update(
         {
@@ -113,6 +116,12 @@ def build_snapshot(
         snapshot["limit_updated_label"] = _as_local(limit_updated_at).strftime("%H:%M")
     if weather is not None:
         snapshot["weather"] = weather
+    if companion is not None:
+        snapshot["companion"] = companion
+    if forecast is not None:
+        snapshot["forecast"] = forecast
+    if audio is not None:
+        snapshot["audio"] = audio
     return snapshot
 
 
@@ -123,6 +132,9 @@ def build_error_snapshot(
     token_usage: dict | None = None,
     limit_updated_at: datetime | None = None,
     weather: dict | None = None,
+    companion: dict | None = None,
+    forecast: dict | None = None,
+    audio: dict | None = None,
 ) -> dict:
     snapshot = _base_snapshot(now or _now())
     snapshot.update({"status": "api_error", "message": message})
@@ -134,4 +146,10 @@ def build_error_snapshot(
         snapshot["limit_updated_label"] = _as_local(limit_updated_at).strftime("%H:%M")
     if weather is not None:
         snapshot["weather"] = weather
+    if companion is not None:
+        snapshot["companion"] = companion
+    if forecast is not None:
+        snapshot["forecast"] = forecast
+    if audio is not None:
+        snapshot["audio"] = audio
     return snapshot

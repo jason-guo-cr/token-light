@@ -2,16 +2,18 @@
 
 Token Light is a small desk dashboard for the Waveshare ESP32-S3-RLCD-4.2. A Mac host process reads local Codex/OpenAI state, builds a compact JSON snapshot, and sends it to the board over USB serial.
 
-The board currently shows:
+The board currently provides three local pages:
 
-- Date, weekday, live/stale status, and Mac battery.
-- Beijing weather, for example `BJ CLD 29C`.
-- Current time.
-- `SYNC HH:MM`, the last successful Codex account sync.
-- The global Codex weekly quota, with remaining, used, and reset information.
-- Local Codex token consumption for today and this week.
+- `OVERVIEW`: clock, weather, battery, weekly quota, 60-minute token burn, quota forecast, onboard temperature/humidity, and the token pet.
+- `CODEX NOW`: a fixed privacy-safe Codex activity state, elapsed time, pet pose, burn, quota, and forecast.
+- `FOCUS`: a board-local 25/5-minute focus timer that keeps running without the Mac.
+
+The GPIO18 KEY is active-low. Short press cycles pages, double press starts/pauses/resumes focus and opens the focus page, and long press resets focus. Long press on the other pages shows `VOICE OFF`; push-to-talk remains gated by the voice feasibility spike.
+
+Codex completion plays one short non-blocking ES8311/I2S tone, except during the default Shanghai quiet period from 22:00 through 07:59. The board reads SHTC3 temperature and humidity every 60 seconds and falls back from cached to stale after five minutes.
 
 Credentials stay on the Mac. The ESP32 only receives rendered snapshot data over serial.
+Companion activity is restricted to fixed state, label, detail, elapsed-seconds, and completion-sequence fields. Prompts, answers, commands, tool input/output, paths, and Codex identifiers are never included.
 
 ## Hardware
 
@@ -75,6 +77,8 @@ Recommended Beijing weather setup:
   --weather-lon 116.4074 \
   --weather-label BJ
 ```
+
+Use `--audio-always` to override quiet hours or `--no-audio` to disable completion sound. Quota samples are retained for 14 days at `~/.cache/token-light/quota-history.jsonl`; override the location with `--quota-history`.
 
 Important intervals:
 
@@ -240,6 +244,12 @@ Run all host-side tests:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -v
+```
+
+Run the pure firmware state-machine tests:
+
+```bash
+.venv/bin/pio test -d firmware -e native
 ```
 
 Build firmware:

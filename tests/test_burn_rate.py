@@ -78,6 +78,17 @@ class BurnRateTests(unittest.TestCase):
         self.assertEqual(result["forecast_label"], "EST --")
         self.assertEqual(result["pace"], "unknown")
 
+    def test_history_shorter_than_thirty_minutes_is_insufficient(self):
+        samples = [
+            self._sample("2026-08-25T10:31:00Z", 19),
+            self._sample("2026-08-25T11:00:00Z", 20),
+        ]
+
+        result = build_burn_rate_snapshot([], samples, self.window, self.now)
+
+        self.assertIsNone(result["projected_used_percent"])
+        self.assertEqual(result["forecast_label"], "EST --")
+
     def test_negative_slope_is_zero_and_projection_is_clamped(self):
         falling = [self._sample("2026-08-25T10:00:00Z", 22), self._sample("2026-08-25T11:00:00Z", 20)]
         hot_window = dict(self.window, used_percent=98)

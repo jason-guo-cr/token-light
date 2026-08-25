@@ -22,6 +22,8 @@ class CliTests(unittest.TestCase):
                 str(FIXTURE),
                 "--stdout",
                 "--once",
+                "--codex-home",
+                str(FIXTURE.parent),
             ],
             check=True,
             capture_output=True,
@@ -47,6 +49,8 @@ class CliTests(unittest.TestCase):
                 str(FIXTURE),
                 "--no-battery",
                 "--no-token-usage",
+                "--codex-home",
+                str(FIXTURE.parent),
             ]
         )
         poller = UsagePoller()
@@ -63,6 +67,8 @@ class CliTests(unittest.TestCase):
             [
                 "--no-battery",
                 "--no-token-usage",
+                "--codex-home",
+                str(FIXTURE.parent),
             ]
         )
         poller = UsagePoller()
@@ -78,12 +84,16 @@ class CliTests(unittest.TestCase):
         self.assertEqual(read_usage.call_count, 2)
 
     def test_usage_poller_keeps_last_good_data_as_cached_after_failure(self):
-        args = build_parser().parse_args(["--no-battery", "--no-token-usage", "--no-weather"])
+        args = build_parser().parse_args(
+            ["--no-battery", "--no-token-usage", "--no-weather", "--codex-home", str(FIXTURE.parent)]
+        )
         poller = UsagePoller()
 
         with patch(
             "token_light.cli._read_usage",
             side_effect=[_load_mock(FIXTURE), UsageFetchError("offline", "SYNC UNAVAILABLE")],
+        ), patch("token_light.cli.record_quota_sample"), patch(
+            "token_light.cli.load_quota_history", return_value=[]
         ):
             live = _build_snapshot(args, usage_poller=poller, now_monotonic=0)
             cached = _build_snapshot(args, usage_poller=poller, now_monotonic=600)

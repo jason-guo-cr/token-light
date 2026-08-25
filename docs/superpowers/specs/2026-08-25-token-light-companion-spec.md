@@ -2,7 +2,7 @@
 
 **版本：** 0.1（TDD 初稿）  
 **日期：** 2026-08-25  
-**状态：** 待实现，测试应处于 RED  
+**状态：** Host 与 firmware 软件范围已实现；真机验收待完成；PTT 未通过 Phase 5 门槛
 **范围：** KEY + 三页面、Codex 状态、Token 宠物、燃速预测、板载温湿度、完成提示音与语音扩展
 
 ## 1. Executive Summary
@@ -540,4 +540,4 @@ Protocol constraints:
 - **最强部分：** 技术边界、隐私协议、六项需求的阶段依赖和可测试性已经明确。
 - **最弱部分：** Voice transport 尚未完成 feasibility 验证；它是显式开放问题，不应提前承诺实现方案。
 - **最高风险假设：** pace 阈值、KEY 手势手感、SHTC3 板载热偏差。
-- **下一步：** 运行新增 RED tests，确认失败原因只来自缺失实现；随后从 Phase 1 的纯状态机开始逐个转绿。
+- **下一步：** 经授权后烧录真机，完成 KEY 100 次、SHTC3 24 小时、完成音与页面边界验收；积累 24 小时 quota 历史后复核 pace 阈值。Phase 5 结论见 `../spikes/2026-08-25-token-light-voice-feasibility.md`。
