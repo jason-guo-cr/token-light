@@ -7,8 +7,8 @@ The board currently shows:
 - Date, weekday, live/stale status, and Mac battery.
 - Beijing weather, for example `BJ CLD 29C`.
 - Current time.
-- `QUERY HH:MM`, the last successful Codex usage-limit API query.
-- 5-hour and weekly Codex usage-limit remaining percentages.
+- `SYNC HH:MM`, the last successful Codex account sync.
+- The global Codex weekly quota, with remaining, used, and reset information.
 - Local Codex token consumption for today and this week.
 
 Credentials stay on the Mac. The ESP32 only receives rendered snapshot data over serial.
@@ -79,7 +79,7 @@ Recommended Beijing weather setup:
 Important intervals:
 
 - `--interval 60`: sends a fresh screen snapshot every minute, keeping the clock current.
-- `--usage-interval 600`: requests Codex 5H/WEEK usage-limit data every 10 minutes.
+- `--usage-interval 600`: requests current Codex quota-window data every 10 minutes.
 - `--weather-interval 1800`: requests weather every 30 minutes.
 
 The host still sends a screen snapshot every minute even when usage-limit data is cached. If the usage API is rate-limited, failed attempts also wait for `--usage-interval` before retrying.
@@ -128,21 +128,33 @@ tail -40 /tmp/token-light.log
 
 ## Snapshot Data Sources
 
-### Codex Usage Limits
+### Codex Account Usage
 
-The host reads the existing Codex Desktop auth token from:
+The host uses the documented Codex App Server method
+[`account/rateLimits/read`](https://learn.chatgpt.com/docs/app-server#6-rate-limits-chatgpt).
+Codex owns authentication and token refresh; Token Light does not read or send
+the access token itself.
 
-```text
-~/.codex/auth.json
+The board renders the general `codex` bucket returned by the current account
+instead of assuming that every plan has both a five-hour and weekly limit. It
+uses one full-width card:
+
+- `CODEX WEEK`: remaining percentage, used percentage, and reset date.
+
+Model-specific preview buckets such as `GPT-5.3-Codex-Spark` are intentionally
+not sent to the board. If the service returns more than one general window, the
+dashboard prefers the longest window.
+
+`SYNC HH:MM` is the last successful account sync time. After a temporary sync
+failure, the board keeps the last good metrics and marks them `CACHE`.
+
+The host finds `codex` on `PATH` and also checks the common Homebrew paths. To
+select it explicitly:
+
+```bash
+TOKEN_LIGHT_CODEX_BIN=/opt/homebrew/bin/codex \
+  .venv/bin/python -m token_light.cli --stdout --once
 ```
-
-It calls the ChatGPT backend usage endpoint and parses:
-
-- Primary window: shown as `5H LIMIT`
-- Secondary window: shown as `WEEK LIMIT`
-- Reset labels in each card's top-right corner
-
-`QUERY HH:MM` is the last successful usage-limit API query time.
 
 ### Token Consumption
 

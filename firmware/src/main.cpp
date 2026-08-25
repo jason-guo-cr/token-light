@@ -34,8 +34,7 @@ static void setBootSnapshot() {
   snapshot.tokenWeekLabel = "";
   snapshot.limitUpdatedLabel = "";
   snapshot.weatherDisplay = "";
-  setWindow(snapshot.primary, "5H LIMIT", 0, 0, "--:--");
-  setWindow(snapshot.secondary, "WEEK LIMIT", 0, 0, "--/--");
+  setWindow(snapshot.primary, "CODEX WEEK", 0, 0, "--/--");
   snapshot.receivedAtMs = 0;
 }
 
@@ -76,18 +75,16 @@ static void applySnapshot(JsonDocument &doc) {
     snapshot.weatherDisplay = weather["display"] | "";
   }
 
-  if (snapshot.status == "live") {
+  if (snapshot.status == "live" || snapshot.status == "cached") {
     snapshot.primary = readWindow(doc["primary"].as<JsonObject>());
-    snapshot.secondary = readWindow(doc["secondary"].as<JsonObject>());
   }
   snapshot.receivedAtMs = millis();
   renderDashboard(*u8g2, snapshot, snapshot.receivedAtMs);
   lastRenderMs = snapshot.receivedAtMs;
-  Serial.printf("token-light: snapshot status=%s time=%s primary=%d secondary=%d\n",
+  Serial.printf("token-light: snapshot status=%s time=%s remaining=%d\n",
                 snapshot.status.c_str(),
                 snapshot.time.c_str(),
-                snapshot.primary.remainingPercent,
-                snapshot.secondary.remainingPercent);
+                snapshot.primary.remainingPercent);
 }
 
 static void processSerialLine(const String &line) {

@@ -22,6 +22,5 @@ struct DisplaySnapshot {
   String limitUpdatedLabel = "";
   String weatherDisplay = "";
   LimitWindow primary;
-  LimitWindow secondary;
   unsigned long receivedAtMs = 0;
 };

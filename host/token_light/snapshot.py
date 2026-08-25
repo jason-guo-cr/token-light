@@ -31,13 +31,30 @@ def _base_snapshot(now: datetime) -> dict:
     }
 
 
-def _label_for_window(window_minutes: int) -> str:
-    if window_minutes == 300:
-        return "5H LIMIT"
+def _bucket_label(window: UsageWindow) -> str:
+    if window.limit_id == "codex" or not window.limit_name:
+        return "CODEX"
+
+    name = window.limit_name.upper()
+    for prefix in ("GPT-5.3-CODEX-", "GPT-5.6-CODEX-", "GPT-CODEX-", "CODEX-"):
+        if name.startswith(prefix):
+            name = name.removeprefix(prefix)
+            break
+    compact = "".join(char for char in name if char.isalnum() or char == " ").strip()
+    return (compact or window.limit_id.upper())[:8]
+
+
+def _period_label(window_minutes: int) -> str:
     if window_minutes == 10080:
-        return "WEEK LIMIT"
+        return "WEEK"
+    if window_minutes % 1440 == 0:
+        return f"{window_minutes // 1440}D"
     hours = max(1, round(window_minutes / 60))
-    return f"{hours}H LIMIT"
+    return f"{hours}H"
+
+
+def _label_for_window(window: UsageWindow) -> str:
+    return f"{_bucket_label(window)} {_period_label(window.window_minutes)}"
 
 
 def _reset_label(reset_at: int, now: datetime) -> str:
@@ -50,13 +67,20 @@ def _reset_label(reset_at: int, now: datetime) -> str:
 
 def _window_snapshot(window: UsageWindow, now: datetime) -> dict:
     return {
-        "label": _label_for_window(window.window_minutes),
+        "label": _label_for_window(window),
         "remaining_percent": window.remaining_percent,
         "used_percent": window.used_percent,
         "reset_label": _reset_label(window.reset_at, now),
         "reset_at": window.reset_at,
         "window_minutes": window.window_minutes,
+        "limit_id": window.limit_id,
     }
+
+
+def _display_window(usage: UsageStatus) -> UsageWindow:
+    general = [window for window in usage.windows if window.limit_id == "codex"]
+    candidates = general or list(usage.windows)
+    return max(candidates, key=lambda window: window.window_minutes)
 
 
 def build_snapshot(
@@ -66,17 +90,21 @@ def build_snapshot(
     token_usage: dict | None = None,
     limit_updated_at: datetime | None = None,
     weather: dict | None = None,
+    status: str = "live",
+    warning: str | None = None,
 ) -> dict:
     current = now or _now()
+    primary = _window_snapshot(_display_window(usage), current)
     snapshot = _base_snapshot(current)
     snapshot.update(
         {
             "plan_type": usage.plan_type,
-            "primary": _window_snapshot(usage.primary, current),
-            "secondary": _window_snapshot(usage.secondary, current),
-            "status": "live",
+            "primary": primary,
+            "status": status,
         }
     )
+    if warning:
+        snapshot["warning"] = warning
     if battery is not None:
         snapshot["battery"] = battery
     if token_usage is not None:

@@ -8,7 +8,6 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from token_light.auth import DEFAULT_AUTH_FILE, AuthError, read_access_token
 from token_light.battery import read_battery_snapshot
 from token_light.codex_usage import UsageFetchError, UsageParseError, fetch_usage, parse_usage
 from token_light.serial_writer import DEFAULT_PORT, detected_esp32_ports, detected_serial_ports, open_serial_port, write_snapshot
@@ -28,15 +27,14 @@ def _env_float(name: str) -> float | None:
     return float(value)
 
 
-def _usage_from_live(auth_file: Path):
-    token = read_access_token(auth_file)
-    return fetch_usage(token)
+def _usage_from_live(codex_bin: str | None):
+    return fetch_usage(codex_bin)
 
 
 def _read_usage(args: argparse.Namespace):
     if args.mock:
         return _load_mock(args.mock)
-    return _usage_from_live(args.auth_file)
+    return _usage_from_live(args.codex_bin)
 
 
 class UsagePoller:
@@ -52,7 +50,7 @@ class UsagePoller:
                 self.usage = _read_usage(args)
                 self.error = None
                 self.updated_at = datetime.now(tz=LOCAL_TZ)
-            except (AuthError, UsageFetchError, UsageParseError) as exc:
+            except (UsageFetchError, UsageParseError) as exc:
                 self.error = exc
             self.next_fetch_at = now_monotonic + args.usage_interval
         return self.usage, self.error, self.updated_at
@@ -91,15 +89,20 @@ def _build_snapshot(
     usage, error, limit_updated_at = usage_poller.get(args, monotonic)
     weather = None if args.no_weather else weather_poller.get(args, monotonic)
     if usage is not None:
+        status = "cached" if error is not None else "live"
+        warning = getattr(error, "display_message", "USAGE DATA CHANGED") if error is not None else None
         return build_snapshot(
             usage,
             battery=battery,
             token_usage=token_usage,
             limit_updated_at=limit_updated_at,
             weather=weather,
+            status=status,
+            warning=warning,
         )
+    display_message = getattr(error, "display_message", "USAGE DATA CHANGED")
     return build_error_snapshot(
-        str(error),
+        display_message,
         battery=battery,
         token_usage=token_usage,
         limit_updated_at=limit_updated_at,
@@ -153,8 +156,8 @@ def run(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Sync Codex usage-limit snapshots to Token Light.")
-    parser.add_argument("--auth-file", type=Path, default=Path(os.environ.get("TOKEN_LIGHT_AUTH_FILE", DEFAULT_AUTH_FILE)))
+    parser = argparse.ArgumentParser(description="Sync Codex account usage snapshots to Token Light.")
+    parser.add_argument("--codex-bin", default=os.environ.get("TOKEN_LIGHT_CODEX_BIN"))
     parser.add_argument("--port", default=os.environ.get("TOKEN_LIGHT_PORT", DEFAULT_PORT))
     parser.add_argument("--interval", type=int, default=60)
     parser.add_argument("--usage-interval", type=int, default=600)

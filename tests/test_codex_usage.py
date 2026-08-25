@@ -24,6 +24,75 @@ class CodexUsageTests(unittest.TestCase):
         self.assertEqual(usage.secondary.window_minutes, 10080)
         self.assertEqual(usage.secondary.reset_at, 1780217709)
 
+    def test_parse_app_server_usage_accepts_nullable_secondary_and_additional_bucket(self):
+        payload = {
+            "id": 2,
+            "result": {
+                "rateLimits": {
+                    "limitId": "codex",
+                    "limitName": None,
+                    "planType": "pro",
+                    "primary": {
+                        "usedPercent": 12,
+                        "windowDurationMins": 10080,
+                        "resetsAt": 1786333106,
+                    },
+                    "secondary": None,
+                },
+                "rateLimitsByLimitId": {
+                    "codex": {
+                        "limitId": "codex",
+                        "planType": "pro",
+                        "primary": {
+                            "usedPercent": 12,
+                            "windowDurationMins": 10080,
+                            "resetsAt": 1786333106,
+                        },
+                        "secondary": None,
+                    },
+                    "codex_bengalfox": {
+                        "limitId": "codex_bengalfox",
+                        "limitName": "GPT-5.3-Codex-Spark",
+                        "planType": "pro",
+                        "primary": {
+                            "usedPercent": 4,
+                            "windowDurationMins": 10080,
+                            "resetsAt": 1786333666,
+                        },
+                        "secondary": None,
+                    },
+                },
+            },
+        }
+
+        usage = parse_usage(payload)
+
+        self.assertEqual(usage.plan_type, "pro")
+        self.assertEqual(len(usage.windows), 2)
+        self.assertEqual(usage.primary.window_minutes, 10080)
+        self.assertEqual(usage.primary.remaining_percent, 88)
+        self.assertEqual(usage.secondary.limit_id, "codex_bengalfox")
+        self.assertEqual(usage.secondary.limit_name, "GPT-5.3-Codex-Spark")
+        self.assertEqual(usage.secondary.remaining_percent, 96)
+
+    def test_parse_usage_accepts_single_window(self):
+        payload = {
+            "plan_type": "pro",
+            "rate_limit": {
+                "primary_window": {
+                    "used_percent": 1,
+                    "limit_window_seconds": 604800,
+                    "reset_at": 1786333106,
+                },
+                "secondary_window": None,
+            },
+        }
+
+        usage = parse_usage(payload)
+
+        self.assertEqual(len(usage.windows), 1)
+        self.assertIsNone(usage.secondary)
+
     def test_remaining_percent_is_clamped(self):
         payload = {
             "plan_type": "prolite",

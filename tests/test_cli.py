@@ -31,7 +31,8 @@ class CliTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["type"], "snapshot")
         self.assertEqual(payload["status"], "live")
-        self.assertEqual(payload["primary"]["remaining_percent"], 97)
+        self.assertEqual(payload["primary"]["remaining_percent"], 96)
+        self.assertNotIn("secondary", payload)
 
     def test_defaults_refresh_screen_every_minute_but_usage_every_ten_minutes(self):
         args = build_parser().parse_args([])
@@ -75,6 +76,22 @@ class CliTests(unittest.TestCase):
         self.assertEqual(second["status"], "api_error")
         self.assertEqual(third["status"], "api_error")
         self.assertEqual(read_usage.call_count, 2)
+
+    def test_usage_poller_keeps_last_good_data_as_cached_after_failure(self):
+        args = build_parser().parse_args(["--no-battery", "--no-token-usage", "--no-weather"])
+        poller = UsagePoller()
+
+        with patch(
+            "token_light.cli._read_usage",
+            side_effect=[_load_mock(FIXTURE), UsageFetchError("offline", "SYNC UNAVAILABLE")],
+        ):
+            live = _build_snapshot(args, usage_poller=poller, now_monotonic=0)
+            cached = _build_snapshot(args, usage_poller=poller, now_monotonic=600)
+
+        self.assertEqual(live["status"], "live")
+        self.assertEqual(cached["status"], "cached")
+        self.assertEqual(cached["warning"], "SYNC UNAVAILABLE")
+        self.assertEqual(cached["primary"]["remaining_percent"], 96)
 
 
 if __name__ == "__main__":
