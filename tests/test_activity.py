@@ -135,6 +135,53 @@ class ActivityTests(unittest.TestCase):
         self.assertEqual(result["state"], "thinking")
         self.assertEqual(result["elapsed_seconds"], 10)
 
+    def test_terminal_event_in_one_session_does_not_close_another_open_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codex_home = Path(tmp)
+            self._write(
+                codex_home / "sessions/session-a.jsonl",
+                [
+                    self._event("2026-08-25T10:55:00Z", "task_started"),
+                    self._tool("2026-08-25T10:59:50Z", "exec", "python -m unittest"),
+                ],
+            )
+            self._write(
+                codex_home / "sessions/session-b.jsonl",
+                [
+                    self._event("2026-08-25T10:56:00Z", "task_started"),
+                    self._event("2026-08-25T10:59:00Z", "task_complete"),
+                ],
+            )
+
+            result = read_codex_activity(codex_home, datetime(2026, 8, 25, 19, 0, tzinfo=TZ))
+
+        self.assertEqual(result["state"], "testing")
+        self.assertEqual(result["elapsed_seconds"], 300)
+        self.assertEqual(result["completion_seq"], 1)
+
+    def test_most_recent_open_session_wins_when_several_are_active(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codex_home = Path(tmp)
+            self._write(
+                codex_home / "sessions/session-a.jsonl",
+                [
+                    self._event("2026-08-25T10:55:00Z", "task_started"),
+                    self._tool("2026-08-25T10:59:40Z", "exec", "python -m unittest"),
+                ],
+            )
+            self._write(
+                codex_home / "sessions/session-b.jsonl",
+                [
+                    self._event("2026-08-25T10:56:00Z", "task_started"),
+                    self._tool("2026-08-25T10:59:50Z", "apply_patch", "private"),
+                ],
+            )
+
+            result = read_codex_activity(codex_home, datetime(2026, 8, 25, 19, 0, tzinfo=TZ))
+
+        self.assertEqual(result["state"], "editing")
+        self.assertEqual(result["elapsed_seconds"], 240)
+
     def _read(self, events, now=None):
         with tempfile.TemporaryDirectory() as tmp:
             codex_home = Path(tmp)

@@ -2,7 +2,7 @@
 
 **版本：** 0.1（TDD 初稿）  
 **日期：** 2026-08-25  
-**状态：** Host 与 firmware 软件范围已实现；真机验收待完成；PTT 未通过 Phase 5 门槛
+**状态：** Host 与 firmware 软件范围已实现；真机验收待完成；Phase 5 仅完成静态调查，PTT 实测门槛尚未证明
 **范围：** KEY + 三页面、Codex 状态、Token 宠物、燃速预测、板载温湿度、完成提示音与语音扩展
 
 ## 1. Executive Summary
@@ -458,9 +458,9 @@ Protocol constraints:
 - 接入 SHTC3，完成 cached/stale UI。
 - 进行 24 小时稳定性运行。
 
-### Phase 5 — Voice Feasibility and Optional Delivery
+### Phase 5 — Voice Feasibility and Optional Delivery（静态调查完成，实测待执行）
 
-- 测试 USB/网络音频传输候选方案。
+- 在实机上测试 USB CDC、USB Audio Class 与网络音频传输候选方案；`Serial.begin(115200)` 在当前 HW USB CDC 配置下不能作为 115200-baud UART 吞吐证据。
 - 满足延迟、隐私和稳定性门槛后，才实现 PTT 完整链路。
 
 ## 17. TDD Plan

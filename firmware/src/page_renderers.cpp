@@ -33,9 +33,19 @@ void drawTopStatus(U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t nowMs) 
   }
 }
 
-String visiblePetPose(const DisplaySnapshot &snapshot, bool focusRunning) {
-  if (snapshot.petPose == "alert" || snapshot.petPose == "celebrate") return snapshot.petPose;
+bool beforeDeadline(bool active, uint32_t nowMs, uint32_t deadlineMs) {
+  return active && static_cast<int32_t>(deadlineMs - nowMs) > 0;
+}
+
+String visiblePetPose(const DisplaySnapshot &snapshot, bool focusRunning, uint32_t nowMs) {
+  if (snapshot.petPose == "alert") return "alert";
+  if (beforeDeadline(snapshot.celebrationActive, nowMs, snapshot.celebrationUntilMs)) {
+    return "celebrate";
+  }
   if (focusRunning) return "focus";
+  if (snapshot.petPose == "celebrate") {
+    return snapshot.primary.valid && snapshot.primary.remainingPercent <= 10 ? "tired" : "sleep";
+  }
   return snapshot.petPose;
 }
 }
@@ -49,10 +59,19 @@ void renderOverviewPage(
   drawCentered(u8g2, 91, snapshot.time);
 
   u8g2.setFont(u8g2_font_9x18B_tf);
-  String quota = snapshot.primary.label + "  " + String(snapshot.primary.remainingPercent) + "% LEFT  " + snapshot.forecastLabel;
+  String quota;
+  if (snapshot.primary.valid) {
+    quota = snapshot.primary.label + "  " + String(snapshot.primary.remainingPercent) + "% LEFT  " + snapshot.forecastLabel;
+  } else if (snapshot.status == "api_error" && snapshot.message.length() > 0) {
+    quota = "CODEX WEEK  " + snapshot.message;
+  } else {
+    quota = "CODEX WEEK  --% LEFT  EST --";
+  }
   u8g2.drawStr(20, 132, quota.c_str());
   u8g2.drawFrame(20, 143, 360, 12);
-  const int quotaWidth = 356 * constrain(snapshot.primary.remainingPercent, 0, 100) / 100;
+  const int quotaWidth = snapshot.primary.valid
+                             ? 356 * constrain(snapshot.primary.remainingPercent, 0, 100) / 100
+                             : 0;
   u8g2.drawBox(22, 145, quotaWidth, 8);
 
   String burn = "BURN " + snapshot.tokenBurnLabel + "  PACE " + snapshot.paceLabel;
@@ -66,7 +85,7 @@ void renderOverviewPage(
   u8g2.drawStr(20, 220, indoor.c_str());
   String token = "DAY " + snapshot.tokenTodayLabel + "  WEEK " + snapshot.tokenWeekLabel;
   u8g2.drawStr(20, 249, token.c_str());
-  drawPet(u8g2, 332, 209, 3, visiblePetPose(snapshot, false), nowMs);
+  drawPet(u8g2, 332, 209, 3, visiblePetPose(snapshot, false, nowMs), nowMs);
 
   u8g2.setFont(u8g2_font_5x8_tf);
   u8g2.drawStr(20, 287, "SHORT: NEXT   DOUBLE: FOCUS   HOLD: VOICE");
@@ -85,9 +104,10 @@ void renderActivityPage(U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t no
   u8g2.setFont(u8g2_font_logisoso20_tn);
   drawCentered(u8g2, 144, elapsedLabel(snapshot.activityElapsedSeconds));
 
-  drawPet(u8g2, 168, 157, 4, visiblePetPose(snapshot, false), nowMs);
+  drawPet(u8g2, 168, 157, 4, visiblePetPose(snapshot, false, nowMs), nowMs);
   u8g2.setFont(u8g2_font_6x13B_tf);
-  String footer = "BURN " + snapshot.tokenBurnLabel + "  WEEK " + String(snapshot.primary.remainingPercent) + "%  " + snapshot.forecastLabel;
+  String week = snapshot.primary.valid ? String(snapshot.primary.remainingPercent) + "%" : "--%";
+  String footer = "BURN " + snapshot.tokenBurnLabel + "  WEEK " + week + "  " + snapshot.forecastLabel;
   drawCentered(u8g2, 259, footer);
   u8g2.setFont(u8g2_font_5x8_tf);
   drawCentered(u8g2, 289, "SHORT: NEXT   DOUBLE: FOCUS   HOLD: VOICE");
@@ -109,7 +129,7 @@ void renderFocusPage(
   drawCentered(u8g2, 136, state);
 
   const bool running = controller.focusRunState() == FocusRunState::Running;
-  drawPet(u8g2, 168, 153, 4, visiblePetPose(snapshot, running), nowMs);
+  drawPet(u8g2, 168, 153, 4, visiblePetPose(snapshot, running, nowMs), nowMs);
   u8g2.setFont(u8g2_font_6x13B_tf);
   drawCentered(u8g2, 246, controller.focusPhase() == FocusPhase::Focus ? "DEEP WORK" : "TAKE A BREAK");
   u8g2.setFont(u8g2_font_5x8_tf);

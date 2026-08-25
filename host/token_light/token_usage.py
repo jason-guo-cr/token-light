@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -14,6 +15,16 @@ SESSION_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 def _session_id(path: Path) -> str:
     match = SESSION_RE.search(path.name)
     return match.group(1) if match else path.stem
+
+
+def _token_value(value, *, default=None) -> int | None:
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if not math.isfinite(value) or value < 0:
+        return None
+    return int(value)
 
 
 def iter_token_count_events(codex_home: Path | str | None = None):
@@ -37,19 +48,35 @@ def iter_token_count_events(codex_home: Path | str | None = None):
                         obj = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    payload = obj.get("payload") or {}
+                    if not isinstance(obj, dict):
+                        continue
+                    payload = obj.get("payload")
+                    if not isinstance(payload, dict):
+                        continue
                     if payload.get("type") != "token_count":
                         continue
-                    usage = ((payload.get("info") or {}).get("last_token_usage") or {})
+                    info = payload.get("info")
+                    if not isinstance(info, dict):
+                        continue
+                    usage = info.get("last_token_usage")
+                    if not isinstance(usage, dict):
+                        continue
                     timestamp = obj.get("timestamp")
-                    if not timestamp or not usage:
+                    if not timestamp:
+                        continue
+                    total = _token_value(usage.get("total_tokens"))
+                    input_tokens = _token_value(usage.get("input_tokens"), default=0)
+                    cached_input = _token_value(usage.get("cached_input_tokens"), default=0)
+                    output = _token_value(usage.get("output_tokens"), default=0)
+                    if None in (total, input_tokens, cached_input, output):
                         continue
                     key = (
                         sid,
                         timestamp,
-                        usage.get("total_tokens"),
-                        usage.get("input_tokens"),
-                        usage.get("output_tokens"),
+                        total,
+                        input_tokens,
+                        cached_input,
+                        output,
                     )
                     if key in seen:
                         continue
@@ -60,10 +87,10 @@ def iter_token_count_events(codex_home: Path | str | None = None):
                         continue
                     yield {
                         "timestamp": timestamp,
-                        "total_tokens": usage.get("total_tokens") or 0,
-                        "input": usage.get("input_tokens") or 0,
-                        "cached_input": usage.get("cached_input_tokens") or 0,
-                        "output": usage.get("output_tokens") or 0,
+                        "total_tokens": total,
+                        "input": input_tokens,
+                        "cached_input": cached_input,
+                        "output": output,
                     }
 
 

@@ -7,6 +7,7 @@ struct LimitWindow {
   int remainingPercent = 0;
   int usedPercent = 0;
   String resetLabel = "";
+  bool valid = false;
 };
 
 struct DisplaySnapshot {
@@ -30,6 +31,8 @@ struct DisplaySnapshot {
   unsigned long activityElapsedSeconds = 0;
   unsigned long completionSequence = 0;
   String petPose = "sleep";
+  bool celebrationActive = false;
+  unsigned long celebrationUntilMs = 0;
   bool audioEnabled = true;
   bool audioQuiet = false;
   LimitWindow primary;

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -33,6 +34,7 @@ _TEST_MARKERS = (
     "pnpm test",
     "yarn test",
 )
+_SESSION_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
 
 
 def _parse_timestamp(value: Any) -> datetime | None:
@@ -87,6 +89,11 @@ def _event_from_object(obj: Any) -> dict[str, Any] | None:
     return None
 
 
+def _session_id(path: Path) -> str:
+    match = _SESSION_RE.search(path.name)
+    return match.group(1) if match else path.stem
+
+
 def _iter_events(codex_home: Path):
     seen: set[tuple[Any, ...]] = set()
     for root_name in ("sessions", "archived_sessions"):
@@ -98,6 +105,7 @@ def _iter_events(codex_home: Path):
         except OSError:
             continue
         for path in paths:
+            session_id = _session_id(path)
             try:
                 handle = path.open("r", encoding="utf-8", errors="replace")
             except OSError:
@@ -110,10 +118,11 @@ def _iter_events(codex_home: Path):
                         continue
                     if event is None:
                         continue
-                    key = (event["timestamp"], event["kind"], event.get("state"))
+                    key = (session_id, event["timestamp"], event["kind"], event.get("state"))
                     if key in seen:
                         continue
                     seen.add(key)
+                    event["session_id"] = session_id
                     yield event
 
 
@@ -128,6 +137,32 @@ def _result(state: str, elapsed_seconds: int, completion_seq: int) -> dict[str, 
     }
 
 
+def _session_summary(events: list[dict[str, Any]]) -> dict[str, Any]:
+    active_start: datetime | None = None
+    active_events: list[dict[str, Any]] = []
+    latest_terminal: dict[str, Any] | None = None
+    terminal_start: datetime | None = None
+
+    for event in events:
+        if event["kind"] == "task_started":
+            active_start = event["timestamp"]
+            active_events = [event]
+        elif event["kind"] in {"task_complete", "turn_aborted"}:
+            latest_terminal = event
+            terminal_start = active_start
+            active_start = None
+            active_events = []
+        elif active_start is not None:
+            active_events.append(event)
+
+    return {
+        "active_start": active_start,
+        "active_events": active_events,
+        "terminal": latest_terminal,
+        "terminal_start": terminal_start,
+    }
+
+
 def read_codex_activity(codex_home: Path | str, now: datetime) -> dict[str, Any]:
     """Return a fixed, privacy-safe activity summary from local Codex logs."""
     home = Path(codex_home).expanduser()
@@ -139,32 +174,23 @@ def read_codex_activity(codex_home: Path | str, now: datetime) -> dict[str, Any]
     if not events:
         return _result("idle", 0, completion_seq)
 
-    task_start_index = -1
-    terminal_index = -1
-    terminal_start_index = -1
-    for index, event in enumerate(events):
-        if event["kind"] == "task_started":
-            task_start_index = index
-        elif event["kind"] in {"task_complete", "turn_aborted"}:
-            terminal_index = index
-            terminal_start_index = task_start_index
-            task_start_index = -1
+    by_session: dict[str, list[dict[str, Any]]] = {}
+    for event in events:
+        by_session.setdefault(event["session_id"], []).append(event)
+    summaries = [_session_summary(session_events) for session_events in by_session.values()]
 
-    if task_start_index >= 0:
-        active_events = events[task_start_index:]
-        start_at = active_events[0]["timestamp"]
+    active = [summary for summary in summaries if summary["active_start"] is not None]
+    if active:
+        selected = max(
+            active,
+            key=lambda summary: (
+                summary["active_events"][-1]["timestamp"],
+                summary["active_start"],
+            ),
+        )
+        active_events = selected["active_events"]
+        start_at = selected["active_start"]
         latest = active_events[-1]
-        if latest["kind"] == "task_complete":
-            elapsed = int((latest["timestamp"] - start_at).total_seconds())
-            if current - latest["timestamp"] <= timedelta(minutes=2):
-                return _result("done", elapsed, completion_seq)
-            return _result("idle", 0, completion_seq)
-        if latest["kind"] == "turn_aborted":
-            elapsed = int((latest["timestamp"] - start_at).total_seconds())
-            if current - latest["timestamp"] <= timedelta(minutes=2):
-                return _result("error", elapsed, completion_seq)
-            return _result("idle", 0, completion_seq)
-
         elapsed = int((current - start_at).total_seconds())
         if current - latest["timestamp"] >= timedelta(minutes=5):
             return _result("waiting", elapsed, completion_seq)
@@ -174,15 +200,15 @@ def read_codex_activity(codex_home: Path | str, now: datetime) -> dict[str, Any]
                 state = event["state"]
         return _result(state, elapsed, completion_seq)
 
-    if terminal_index >= 0:
-        terminal = events[terminal_index]
+    terminal_summaries = [summary for summary in summaries if summary["terminal"] is not None]
+    if terminal_summaries:
+        selected = max(terminal_summaries, key=lambda summary: summary["terminal"]["timestamp"])
+        terminal = selected["terminal"]
         state = "done" if terminal["kind"] == "task_complete" else "error"
         if current - terminal["timestamp"] <= timedelta(minutes=2):
             elapsed = 0
-            if terminal_start_index >= 0:
-                elapsed = int(
-                    (terminal["timestamp"] - events[terminal_start_index]["timestamp"]).total_seconds()
-                )
+            if selected["terminal_start"] is not None:
+                elapsed = int((terminal["timestamp"] - selected["terminal_start"]).total_seconds())
             result = _result(state, elapsed, completion_seq)
             if state == "done":
                 result["_completion_age_seconds"] = max(
