@@ -46,6 +46,7 @@ class TokenUsageTests(unittest.TestCase):
                 self._event("2026-05-30T08:00:05Z", "corrupt"),
                 self._event("2026-05-30T08:00:06Z", True),
                 self._event("2026-05-30T08:00:07Z", -1),
+                self._event("2026-05-30T08:00:08Z", 1e20),
             ]
             log.write_text(
                 "\n".join(json.dumps(event) for event in [*malformed, valid]) + "\n",
@@ -71,6 +72,22 @@ class TokenUsageTests(unittest.TestCase):
             log.write_text(json.dumps(event) + "\n", encoding="utf-8")
 
             self.assertEqual(list(iter_token_count_events(codex_home)), [])
+
+    def test_oversized_integer_discards_only_the_bad_event(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            codex_home = Path(tmp)
+            log = codex_home / "sessions/rollout.jsonl"
+            log.parent.mkdir(parents=True)
+            oversized = self._event("2026-05-30T08:00:00Z", 10**400)
+            valid = self._event("2026-05-30T08:00:01Z", 12)
+            log.write_text(
+                "\n".join(json.dumps(event) for event in (oversized, valid)) + "\n",
+                encoding="utf-8",
+            )
+
+            events = list(iter_token_count_events(codex_home))
+
+        self.assertEqual([event["total_tokens"] for event in events], [12])
 
     @staticmethod
     def _event(timestamp, total):

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 
 LOCAL_TZ = ZoneInfo("Asia/Shanghai")
 SESSION_RE = re.compile(r"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})")
+MAX_TOKEN_VALUE = (1 << 63) - 1
 
 
 def _session_id(path: Path) -> str:
@@ -20,11 +21,18 @@ def _session_id(path: Path) -> str:
 def _token_value(value, *, default=None) -> int | None:
     if value is None:
         return default
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    if isinstance(value, bool):
         return None
-    if not math.isfinite(value) or value < 0:
+    if isinstance(value, int):
+        return value if 0 <= value <= MAX_TOKEN_VALUE else None
+    if not isinstance(value, float):
         return None
-    return int(value)
+    if not math.isfinite(value) or not 0 <= value <= MAX_TOKEN_VALUE:
+        return None
+    try:
+        return int(value)
+    except (OverflowError, ValueError):
+        return None
 
 
 def iter_token_count_events(codex_home: Path | str | None = None):
