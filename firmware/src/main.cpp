@@ -5,19 +5,20 @@
 #include "ST7305_U8g2.h"
 #include "ambient_model.h"
 #include "audio_driver.h"
+#include "board_input_config.h"
 #include "companion_controller.h"
 #include "completion_notifier.h"
 #include "dashboard_render.h"
 #include "key_gesture.h"
 #include "shtc3_reader.h"
 #include "snapshot_protocol.h"
+#include "three_key_input.h"
 
 #define RLCD_SCK_PIN 11
 #define RLCD_MOSI_PIN 12
 #define RLCD_DC_PIN 5
 #define RLCD_CS_PIN 40
 #define RLCD_RST_PIN 41
-#define KEY_PIN 18
 #define I2C_SDA_PIN 13
 #define I2C_SCL_PIN 14
 
@@ -27,13 +28,14 @@ static DisplaySnapshot snapshot;
 static SnapshotProtocolState protocolState;
 static CompanionController companionController;
 static KeyGestureDetector keyGesture(30, 350, 800);
+static ThreeKeyInput threeKeyInput(30, 800);
 static AmbientModel ambientModel(300000);
 static Shtc3Reader shtc3(Wire);
 static CompletionNotifier completionNotifier;
 static AudioDriver audioDriver(Wire);
 static String lineBuffer;
 static unsigned long lastRenderMs = 0;
-static unsigned long voiceOffUntilMs = 0;
+static unsigned long actionFeedbackUntilMs = 0;
 
 static bool beforeDeadline(uint32_t nowMs, uint32_t deadlineMs) {
   return static_cast<int32_t>(deadlineMs - nowMs) > 0;
@@ -93,7 +95,8 @@ static bool applySnapshot(JsonDocument &doc) {
 
 static void renderNow(uint32_t nowMs) {
   renderDashboard(*u8g2, snapshot, companionController, ambientModel.snapshot(nowMs), nowMs,
-                  beforeDeadline(nowMs, voiceOffUntilMs));
+                  BoardInputConfig::kThreeKeyEnabled,
+                  beforeDeadline(nowMs, actionFeedbackUntilMs));
   lastRenderMs = nowMs;
 }
 
@@ -137,7 +140,34 @@ static void readSerialInput() {
 }
 
 static bool handleKey(uint32_t nowMs) {
-  const KeyGesture gesture = keyGesture.update(digitalRead(KEY_PIN) == LOW, nowMs);
+#if TOKEN_LIGHT_INPUT_PROFILE == TOKEN_LIGHT_PROFILE_THREE_KEY
+  const ThreeKeyLevels levels = {
+      digitalRead(BoardInputConfig::kLeftKeyPin) == LOW,
+      digitalRead(BoardInputConfig::kCenterKeyPin) == LOW,
+      digitalRead(BoardInputConfig::kRightKeyPin) == LOW,
+  };
+  const ThreeKeyEvent event = threeKeyInput.update(levels, nowMs);
+  switch (event) {
+    case ThreeKeyEvent::LeftShort:
+      companionController.onPreviousPage();
+      break;
+    case ThreeKeyEvent::CenterShort:
+      companionController.onCenterShort(nowMs);
+      break;
+    case ThreeKeyEvent::CenterLong:
+      companionController.onCenterLong();
+      break;
+    case ThreeKeyEvent::RightShort:
+      companionController.onNextPage();
+      break;
+    case ThreeKeyEvent::None:
+      return false;
+  }
+  actionFeedbackUntilMs = nowMs + 1000U;
+  return true;
+#else
+  const KeyGesture gesture =
+      keyGesture.update(digitalRead(BoardInputConfig::kLegacyKeyPin) == LOW, nowMs);
   switch (gesture) {
     case KeyGesture::Short:
       companionController.onShortPress();
@@ -147,12 +177,13 @@ static bool handleKey(uint32_t nowMs) {
       return true;
     case KeyGesture::Long:
       if (companionController.onLongPress()) {
-        voiceOffUntilMs = nowMs + 1200;
+        actionFeedbackUntilMs = nowMs + 1200U;
       }
       return true;
     case KeyGesture::None:
       return false;
   }
+#endif
   return false;
 }
 
@@ -160,7 +191,14 @@ void setup() {
   Serial.setRxBufferSize(2048);
   Serial.begin(115200);
   delay(1000);
-  pinMode(KEY_PIN, INPUT_PULLUP);
+#if TOKEN_LIGHT_INPUT_PROFILE == TOKEN_LIGHT_PROFILE_THREE_KEY
+  const uint8_t threeKeyPinMode = BoardInputConfig::kThreeKeyExternalPullups ? INPUT : INPUT_PULLUP;
+  pinMode(BoardInputConfig::kLeftKeyPin, threeKeyPinMode);
+  pinMode(BoardInputConfig::kCenterKeyPin, threeKeyPinMode);
+  pinMode(BoardInputConfig::kRightKeyPin, threeKeyPinMode);
+#else
+  pinMode(BoardInputConfig::kLegacyKeyPin, INPUT_PULLUP);
+#endif
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   Wire.setClock(400000);
   Wire.setTimeOut(20);
