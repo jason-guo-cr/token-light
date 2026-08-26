@@ -19,18 +19,6 @@ enum class FocusRunState {
   Paused,
 };
 
-enum class ActionFeedback {
-  None,
-  PageOverview,
-  PageActivity,
-  PageFocus,
-  FocusStarted,
-  FocusPaused,
-  FocusResumed,
-  FocusReset,
-  VoiceOff,
-};
-
 class CompanionController {
  public:
   CompanionController();
@@ -39,12 +27,7 @@ class CompanionController {
   FocusPhase focusPhase() const;
   FocusRunState focusRunState() const;
   uint32_t remainingSeconds() const;
-  ActionFeedback actionFeedback() const;
 
-  void onPreviousPage();
-  void onNextPage();
-  void onCenterShort(uint32_t nowMs);
-  bool onCenterLong();
   void onShortPress();
   void onDoublePress(uint32_t nowMs);
   bool onLongPress();
@@ -52,7 +35,6 @@ class CompanionController {
   bool consumeIntervalCompleted();
 
  private:
-  void setPageFeedback();
   void resetFocus();
 
   Page page_;
@@ -62,5 +44,4 @@ class CompanionController {
   uint32_t lastTickMs_;
   uint32_t partialSecondMs_;
   bool intervalCompleted_;
-  ActionFeedback actionFeedback_;
 };
