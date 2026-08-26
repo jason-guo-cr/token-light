@@ -105,35 +105,21 @@ FOCUS                       25:00
 
           [FOCUS PET]
 
-DOUBLE: PAUSE       HOLD: RESET
+CENTER: FOCUS       HOLD CENTER: RESET
 ```
 
 - 默认 25 分钟专注、5 分钟休息。
 - v1 不持久化，重启后回到 25:00 READY。
 - 专注计时完全在 ESP32 上运行，断开 Mac 后仍继续。
 
-## 7. KEY Interaction Contract
+## 7. Input Interaction Contract
 
-KEY 为 GPIO18、低电平有效，配置 `INPUT_PULLUP`。
+本节已由 `2026-08-26-token-light-three-key-input-spec.md` 取代；后者是输入行为的唯一契约。
 
-### 全局手势
-
-- 短按：`OVERVIEW -> CODEX NOW -> FOCUS -> OVERVIEW`。
-- 双击：切换专注计时的开始/暂停/恢复，并跳到 `FOCUS`。
-- 长按：
-  - `FOCUS` 页面：重置到 25:00 READY。
-  - `OVERVIEW` 或 `CODEX NOW`：进入语音交互状态；在语音功能未启用时显示 `VOICE OFF`，不得误触发其他操作。
-
-### 手势参数
-
-- 去抖：30 ms。
-- 双击窗口：第一次释放后的 350 ms。
-- 长按阈值：800 ms。
-- 双击不得额外产生短按。
-- 长按不得额外产生短按。
-- 页面切换应在手势确认后 100 ms 内完成。
-
-🔶 **Assumption：** 350 ms 双击窗口和 800 ms 长按阈值具有可接受的手感，需真机验证。
+- 默认 `legacy_single_key` 档案继续使用 GPIO18 KEY，并保留既有短按换页、双击专注控制、长按 reset/`VOICE OFF` 行为。
+- 仅在三个独立 GPIO 的接线与真机 gate 完成后，才可选择 `three_key`：LEFT 上一页、RIGHT 下一页、CENTER 开始/暂停/恢复，CENTER 长按 800 ms 执行 reset/`VOICE OFF`。
+- `three_key` 使用 30 ms 去抖、释放即确认短按，不识别或等待双击；同时输入由 `Left -> Center -> Right` 固定优先级仲裁。
+- 未满足硬件 gate 时不得将 `three_key` 设为发布默认档案，也不得用 BOOT/PWR 冒充业务键。
 
 ## 8. Requirement R1 — KEY + Three-page Framework
 
@@ -148,10 +134,10 @@ KEY 为 GPIO18、低电平有效，配置 `INPUT_PULLUP`。
 
 ### Acceptance Criteria
 
-- 三次短按完整循环三个页面。
-- 双击可开始、暂停、恢复计时。
+- LEFT/RIGHT 分别完整反向/正向循环三个页面。
+- CENTER 短按可开始、暂停、恢复计时且切到 `FOCUS`。
 - 暂停期间剩余时间不变化。
-- 长按重置专注状态。
+- CENTER 长按仅在 `FOCUS` 重置专注状态，其他页面显示 `VOICE OFF`。
 - 断开 USB 不影响 KEY 和计时。
 - `millis()` 在 `UINT32_MAX` 回绕时不跳时或提前完成。
 
@@ -420,7 +406,9 @@ Protocol constraints:
 ### Firmware Additions
 
 - `companion_controller.h/.cpp`：页面和专注计时纯状态机。
-- `key_gesture.h/.cpp`：按键去抖与手势识别纯状态机。
+- `key_gesture.h/.cpp`：`legacy_single_key` 的按键去抖与手势识别纯状态机。
+- `three_key_input.h/.cpp`：`three_key` 的去抖、长按与多键仲裁纯状态机。
+- `board_input_config.h`：输入档案、GPIO 和上拉方式的集中构建时配置。
 - `ambient_model.h/.cpp`：有效值、cache、stale 状态机。
 - `shtc3_reader.h/.cpp`：硬件 I2C adapter。
 - `completion_notifier.h/.cpp`：completion_seq、quiet hours 与一次性播放决策。

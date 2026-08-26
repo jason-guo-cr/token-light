@@ -7,7 +7,10 @@
 #include "dashboard_state.h"
 
 void renderOverviewPage(
-    U8G2 &u8g2, const DisplaySnapshot &snapshot, const AmbientSnapshot &ambient, uint32_t nowMs);
-void renderActivityPage(U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t nowMs);
+    U8G2 &u8g2, const DisplaySnapshot &snapshot, const AmbientSnapshot &ambient, uint32_t nowMs,
+    bool threeKeyProfile);
+void renderActivityPage(
+    U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t nowMs, bool threeKeyProfile);
 void renderFocusPage(
-    U8G2 &u8g2, const DisplaySnapshot &snapshot, const CompanionController &controller, uint32_t nowMs);
+    U8G2 &u8g2, const DisplaySnapshot &snapshot, const CompanionController &controller,
+    uint32_t nowMs, bool threeKeyProfile);

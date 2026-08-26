@@ -1,5 +1,6 @@
 #include "page_renderers.h"
 
+#include "page_footer_labels.h"
 #include "pet_sprites.h"
 
 namespace {
@@ -51,7 +52,8 @@ String visiblePetPose(const DisplaySnapshot &snapshot, bool focusRunning, uint32
 }
 
 void renderOverviewPage(
-    U8G2 &u8g2, const DisplaySnapshot &snapshot, const AmbientSnapshot &ambient, uint32_t nowMs) {
+    U8G2 &u8g2, const DisplaySnapshot &snapshot, const AmbientSnapshot &ambient, uint32_t nowMs,
+    bool threeKeyProfile) {
   drawTopStatus(u8g2, snapshot, nowMs);
 
   u8g2.drawFrame(20, 33, 360, 69);
@@ -88,10 +90,11 @@ void renderOverviewPage(
   drawPet(u8g2, 332, 209, 3, visiblePetPose(snapshot, false, nowMs), nowMs);
 
   u8g2.setFont(u8g2_font_5x8_tf);
-  u8g2.drawStr(20, 287, "SHORT: NEXT   DOUBLE: FOCUS   HOLD: VOICE");
+  u8g2.drawStr(20, 287, navigationFooterLabels(threeKeyProfile).primary);
 }
 
-void renderActivityPage(U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t nowMs) {
+void renderActivityPage(
+    U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t nowMs, bool threeKeyProfile) {
   u8g2.setFont(u8g2_font_9x18B_tf);
   u8g2.drawStr(18, 26, "CODEX NOW");
   const bool stale = snapshot.receivedAtMs > 0 && nowMs - snapshot.receivedAtMs > 300000UL;
@@ -110,11 +113,12 @@ void renderActivityPage(U8G2 &u8g2, const DisplaySnapshot &snapshot, uint32_t no
   String footer = "BURN " + snapshot.tokenBurnLabel + "  WEEK " + week + "  " + snapshot.forecastLabel;
   drawCentered(u8g2, 259, footer);
   u8g2.setFont(u8g2_font_5x8_tf);
-  drawCentered(u8g2, 289, "SHORT: NEXT   DOUBLE: FOCUS   HOLD: VOICE");
+  drawCentered(u8g2, 289, navigationFooterLabels(threeKeyProfile).primary);
 }
 
 void renderFocusPage(
-    U8G2 &u8g2, const DisplaySnapshot &snapshot, const CompanionController &controller, uint32_t nowMs) {
+    U8G2 &u8g2, const DisplaySnapshot &snapshot, const CompanionController &controller,
+    uint32_t nowMs, bool threeKeyProfile) {
   u8g2.setFont(u8g2_font_9x18B_tf);
   u8g2.drawStr(18, 26, controller.focusPhase() == FocusPhase::Focus ? "FOCUS" : "BREAK");
   String phaseDuration = controller.focusPhase() == FocusPhase::Focus ? "25:00" : "05:00";
@@ -133,5 +137,11 @@ void renderFocusPage(
   u8g2.setFont(u8g2_font_6x13B_tf);
   drawCentered(u8g2, 246, controller.focusPhase() == FocusPhase::Focus ? "DEEP WORK" : "TAKE A BREAK");
   u8g2.setFont(u8g2_font_5x8_tf);
-  drawCentered(u8g2, 289, "DOUBLE: START / PAUSE   HOLD: RESET");
+  const PageFooterLabels footer = focusFooterLabels(threeKeyProfile);
+  if (footer.secondary != nullptr) {
+    drawCentered(u8g2, 278, footer.primary);
+    drawCentered(u8g2, 291, footer.secondary);
+  } else {
+    drawCentered(u8g2, 289, footer.primary);
+  }
 }

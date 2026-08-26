@@ -8,7 +8,11 @@ The board currently provides three local pages:
 - `CODEX NOW`: a fixed privacy-safe Codex activity state, elapsed time, pet pose, burn, quota, and forecast.
 - `FOCUS`: a board-local 25/5-minute focus timer that keeps running without the Mac.
 
-The GPIO18 KEY is active-low. Short press cycles pages, double press starts/pauses/resumes focus and opens the focus page, and long press resets focus. Long press on the other pages shows `VOICE OFF`; push-to-talk remains gated by the voice feasibility spike.
+Firmware defaults to the `legacy_single_key` input profile because the stock board exposes only the active-low GPIO18 KEY for customizable runtime input. Its short/double/long behavior remains unchanged for deployed hardware.
+
+The opt-in `three_key` profile accepts three independently wired, active-low inputs: LEFT navigates to the previous page, RIGHT to the next page, and CENTER starts/pauses/resumes focus. Holding CENTER for 800 ms resets focus only from the FOCUS page; on other pages it shows `VOICE OFF`. Three-key clicks have no double-click window. This profile cannot build until verified LEFT/CENTER/RIGHT GPIOs are supplied through `TOKEN_LIGHT_LEFT_KEY_PIN`, `TOKEN_LIGHT_CENTER_KEY_PIN`, and `TOKEN_LIGHT_RIGHT_KEY_PIN`; set `TOKEN_LIGHT_INPUT_PROFILE=TOKEN_LIGHT_PROFILE_THREE_KEY` only for that hardware. `TOKEN_LIGHT_THREE_KEY_EXTERNAL_PULLUPS` defaults to `0`, so the inputs use `INPUT_PULLUP`; set it explicitly to `1` only when the recorded wiring provides external pull-ups.
+
+The three-key profile is not a release default until its wiring and physical-board gate in `docs/superpowers/specs/2026-08-26-token-light-three-key-input-spec.md` are complete. BOOT and PWR are not substitute business inputs. Push-to-talk remains gated by the voice feasibility spike.
 
 Codex completion plays one short non-blocking ES8311/I2S tone, except during the default Shanghai quiet period from 22:00 through 07:59. The board reads SHTC3 temperature and humidity every 60 seconds and falls back from cached to stale after five minutes.
 

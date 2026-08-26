@@ -11,4 +11,5 @@ void renderDashboard(
     const CompanionController &controller,
     const AmbientSnapshot &ambient,
     unsigned long nowMs,
-    bool voiceOff);
+    bool threeKeyProfile,
+    bool actionFeedbackActive);
