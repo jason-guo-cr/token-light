@@ -1,5 +1,6 @@
 #include "page_renderers.h"
 
+#include "page_footer_labels.h"
 #include "pet_sprites.h"
 
 namespace {
@@ -89,8 +90,7 @@ void renderOverviewPage(
   drawPet(u8g2, 332, 209, 3, visiblePetPose(snapshot, false, nowMs), nowMs);
 
   u8g2.setFont(u8g2_font_5x8_tf);
-  u8g2.drawStr(20, 287, threeKeyProfile ? "LEFT: PREV  CENTER: FOCUS  RIGHT: NEXT"
-                                        : "SHORT: NEXT   DOUBLE: FOCUS   HOLD: VOICE");
+  u8g2.drawStr(20, 287, navigationFooterLabels(threeKeyProfile).primary);
 }
 
 void renderActivityPage(
@@ -113,8 +113,7 @@ void renderActivityPage(
   String footer = "BURN " + snapshot.tokenBurnLabel + "  WEEK " + week + "  " + snapshot.forecastLabel;
   drawCentered(u8g2, 259, footer);
   u8g2.setFont(u8g2_font_5x8_tf);
-  drawCentered(u8g2, 289, threeKeyProfile ? "LEFT: PREV  CENTER: FOCUS  RIGHT: NEXT"
-                                           : "SHORT: NEXT   DOUBLE: FOCUS   HOLD: VOICE");
+  drawCentered(u8g2, 289, navigationFooterLabels(threeKeyProfile).primary);
 }
 
 void renderFocusPage(
@@ -138,6 +137,11 @@ void renderFocusPage(
   u8g2.setFont(u8g2_font_6x13B_tf);
   drawCentered(u8g2, 246, controller.focusPhase() == FocusPhase::Focus ? "DEEP WORK" : "TAKE A BREAK");
   u8g2.setFont(u8g2_font_5x8_tf);
-  drawCentered(u8g2, 289, threeKeyProfile ? "CENTER: FOCUS  HOLD CENTER: RESET"
-                                           : "DOUBLE: START / PAUSE   HOLD: RESET");
+  const PageFooterLabels footer = focusFooterLabels(threeKeyProfile);
+  if (footer.secondary != nullptr) {
+    drawCentered(u8g2, 278, footer.primary);
+    drawCentered(u8g2, 291, footer.secondary);
+  } else {
+    drawCentered(u8g2, 289, footer.primary);
+  }
 }
