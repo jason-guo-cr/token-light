@@ -12,8 +12,7 @@ CompanionController::CompanionController()
       remainingSeconds_(kFocusSeconds),
       lastTickMs_(0),
       partialSecondMs_(0),
-      intervalCompleted_(false),
-      actionFeedback_(ActionFeedback::None) {}
+      intervalCompleted_(false) {}
 
 Page CompanionController::page() const { return page_; }
 
@@ -23,38 +22,7 @@ FocusRunState CompanionController::focusRunState() const { return focusRunState_
 
 uint32_t CompanionController::remainingSeconds() const { return remainingSeconds_; }
 
-ActionFeedback CompanionController::actionFeedback() const { return actionFeedback_; }
-
-void CompanionController::setPageFeedback() {
-  switch (page_) {
-    case Page::Overview:
-      actionFeedback_ = ActionFeedback::PageOverview;
-      break;
-    case Page::Activity:
-      actionFeedback_ = ActionFeedback::PageActivity;
-      break;
-    case Page::Focus:
-      actionFeedback_ = ActionFeedback::PageFocus;
-      break;
-  }
-}
-
-void CompanionController::onPreviousPage() {
-  switch (page_) {
-    case Page::Overview:
-      page_ = Page::Focus;
-      break;
-    case Page::Activity:
-      page_ = Page::Overview;
-      break;
-    case Page::Focus:
-      page_ = Page::Activity;
-      break;
-  }
-  setPageFeedback();
-}
-
-void CompanionController::onNextPage() {
+void CompanionController::onShortPress() {
   switch (page_) {
     case Page::Overview:
       page_ = Page::Activity;
@@ -66,41 +34,29 @@ void CompanionController::onNextPage() {
       page_ = Page::Overview;
       break;
   }
-  setPageFeedback();
 }
 
-void CompanionController::onCenterShort(uint32_t nowMs) {
+void CompanionController::onDoublePress(uint32_t nowMs) {
   page_ = Page::Focus;
   if (focusRunState_ == FocusRunState::Running) {
     tick(nowMs);
     if (focusRunState_ == FocusRunState::Running) {
       focusRunState_ = FocusRunState::Paused;
-      actionFeedback_ = ActionFeedback::FocusPaused;
     }
     return;
   }
 
-  const bool resuming = focusRunState_ == FocusRunState::Paused;
   focusRunState_ = FocusRunState::Running;
   lastTickMs_ = nowMs;
-  actionFeedback_ = resuming ? ActionFeedback::FocusResumed : ActionFeedback::FocusStarted;
 }
 
-bool CompanionController::onCenterLong() {
+bool CompanionController::onLongPress() {
   if (page_ != Page::Focus) {
-    actionFeedback_ = ActionFeedback::VoiceOff;
     return true;
   }
   resetFocus();
-  actionFeedback_ = ActionFeedback::FocusReset;
   return false;
 }
-
-void CompanionController::onShortPress() { onNextPage(); }
-
-void CompanionController::onDoublePress(uint32_t nowMs) { onCenterShort(nowMs); }
-
-bool CompanionController::onLongPress() { return onCenterLong(); }
 
 void CompanionController::tick(uint32_t nowMs) {
   if (focusRunState_ != FocusRunState::Running) {
